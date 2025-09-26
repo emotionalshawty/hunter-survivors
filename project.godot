@@ -1,0 +1,4 @@
+[application]
+config/name="VampSur"
+config/description="A Godot project structure for Vampsur."
+run/main_scene="res://scenes/player.tscn"

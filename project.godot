@@ -1,4 +1,11 @@
 [application]
 config/name="VampSur"
 config/description="A Godot project structure for Vampsur."
-run/main_scene="res://scenes/player.tscn"
+run/main_scene="res://scenes/game.tscn"
+
+[display]
+window/size/viewport_width=1024
+window/size/viewport_height=600
+
+[physics]
+common/physics_fps=60

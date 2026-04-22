@@ -14,3 +14,5 @@ A Vampire Survivors-inspired 2D game built with Godot featuring online multiplay
 | **Fecha de reinicio** | 22 de abril de 2026 |
 
 > El repositorio fue reiniciado desde esta fecha debido a conflictos técnicos en la gestión de branches. El historial anterior está disponible pero no se encuentra en este repositorio actual.
+
+![alt text](image.png)

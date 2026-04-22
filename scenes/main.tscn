@@ -1,0 +1,440 @@
+[gd_scene format=3 uid="uid://djx8m4r5bq3vw"]
+
+[ext_resource type="Script" path="res://scripts/core/game.gd" id="1_main_script"]
+[ext_resource type="PackedScene" path="res://scenes/entities/player.tscn" id="2_player_scene"]
+[ext_resource type="Script" path="res://scripts/ui/arena_backdrop.gd" id="3_backdrop_script"]
+[ext_resource type="Shader" path="res://shaders/post_process.gdshader" id="4_post_process_shader"]
+[ext_resource type="Script" path="res://scripts/core/effects_manager.gd" id="5_effects_manager_script"]
+[ext_resource type="Script" path="res://scripts/ui/tactical_hud.gd" id="6_tactical_hud_script"]
+[ext_resource type="Script" path="res://scripts/ui/game_over_screen.gd" id="7_game_over_script"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_post_process"]
+shader = ExtResource("4_post_process_shader")
+shader_parameter/chromatic_aberration = 2.2
+shader_parameter/vignette_strength = 1.15
+shader_parameter/vignette_radius = 0.85
+shader_parameter/grain_strength = 0.07
+shader_parameter/bloom_strength = 1.1
+shader_parameter/bloom_threshold = 0.55
+shader_parameter/scanline_strength = 0.04
+shader_parameter/exposure = 1.05
+shader_parameter/contrast = 1.14
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_hud_panel"]
+bg_color = Color(0.027451, 0.0470588, 0.0705882, 0.74)
+border_color = Color(0.372549, 0.968627, 0.890196, 0.25)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
+shadow_color = Color(0.0196078, 0.0117647, 0.054902, 0.26)
+shadow_size = 10
+content_margin_left = 18
+content_margin_top = 14
+content_margin_right = 18
+content_margin_bottom = 14
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_level_panel"]
+bg_color = Color(0.0352941, 0.0470588, 0.0862745, 0.95)
+border_color = Color(0.976471, 0.478431, 0.239216, 0.48)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+corner_radius_top_left = 16
+corner_radius_top_right = 16
+corner_radius_bottom_right = 16
+corner_radius_bottom_left = 16
+shadow_color = Color(0.0117647, 0.00784314, 0.027451, 0.52)
+shadow_size = 20
+content_margin_left = 20
+content_margin_top = 16
+content_margin_right = 20
+content_margin_bottom = 16
+
+[sub_resource type="StyleBoxLine" id="StyleBoxLine_hud_separator"]
+color = Color(0.976471, 0.478431, 0.239216, 0.55)
+thickness = 1
+grow_begin = 4.0
+grow_end = 4.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button_normal"]
+bg_color = Color(0.0352941, 0.0862745, 0.121569, 0.95)
+border_color = Color(0.372549, 0.968627, 0.890196, 0.46)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+shadow_color = Color(0.00784314, 0.027451, 0.0431373, 0.35)
+shadow_size = 7
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button_hover"]
+bg_color = Color(0.0627451, 0.145098, 0.196078, 0.97)
+border_color = Color(0.988235, 0.627451, 0.313726, 0.72)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+shadow_color = Color(0.0431373, 0.0235294, 0.00784314, 0.35)
+shadow_size = 9
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_gameover_panel"]
+bg_color = Color(0.039, 0.031, 0.043, 0.97)
+border_color = Color(0.976471, 0.25, 0.23, 0.62)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+shadow_color = Color(0.5, 0.08, 0.08, 0.48)
+shadow_size = 28
+content_margin_left = 28
+content_margin_top = 22
+content_margin_right = 28
+content_margin_bottom = 22
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_gameover_btn_normal"]
+bg_color = Color(0.07, 0.12, 0.16, 0.95)
+border_color = Color(0.372549, 0.968627, 0.890196, 0.55)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+content_margin_left = 20
+content_margin_top = 12
+content_margin_right = 20
+content_margin_bottom = 12
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_gameover_btn_hover"]
+bg_color = Color(0.11, 0.19, 0.24, 0.98)
+border_color = Color(0.988235, 0.627451, 0.313726, 0.85)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+content_margin_left = 20
+content_margin_top = 12
+content_margin_right = 20
+content_margin_bottom = 12
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_gameover_btn_pressed"]
+bg_color = Color(0.17, 0.09, 0.08, 0.98)
+border_color = Color(0.976471, 0.25, 0.23, 0.92)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+content_margin_left = 20
+content_margin_top = 12
+content_margin_right = 20
+content_margin_bottom = 12
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button_pressed"]
+bg_color = Color(0.133333, 0.0901961, 0.0745098, 0.98)
+border_color = Color(0.976471, 0.478431, 0.239216, 0.9)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+shadow_color = Color(0.027451, 0.0156863, 0.0117647, 0.35)
+shadow_size = 9
+
+[node name="Game" type="Node2D"]
+script = ExtResource("1_main_script")
+
+[node name="CanvasModulate" type="CanvasModulate" parent="."]
+color = Color(0.52, 0.58, 0.66, 1)
+
+[node name="Background" type="ColorRect" parent="."]
+offset_left = -2000.0
+offset_top = -2000.0
+offset_right = 2000.0
+offset_bottom = 2000.0
+color = Color(0.0313726, 0.0705882, 0.0862745, 1)
+z_index = -100
+
+[node name="GridPattern" type="Node2D" parent="Background"]
+script = ExtResource("3_backdrop_script")
+
+[node name="Player" parent="." instance=ExtResource("2_player_scene")]
+position = Vector2(576, 324)
+
+[node name="Enemies" type="Node2D" parent="."]
+
+[node name="Projectiles" type="Node2D" parent="."]
+
+[node name="Pickups" type="Node2D" parent="."]
+
+[node name="EffectsManager" type="Node2D" parent="."]
+script = ExtResource("5_effects_manager_script")
+z_index = 10
+
+[node name="SpawnTimer" type="Timer" parent="."]
+wait_time = 1.25
+autostart = true
+
+[node name="DifficultyTimer" type="Timer" parent="."]
+wait_time = 10.0
+autostart = true
+
+[node name="CanvasLayer" type="CanvasLayer" parent="."]
+
+[node name="MarginContainer" type="MarginContainer" parent="CanvasLayer"]
+offset_left = 20.0
+offset_top = 20.0
+offset_right = 470.0
+offset_bottom = 205.0
+
+[node name="HUDPanel" type="PanelContainer" parent="CanvasLayer/MarginContainer"]
+custom_minimum_size = Vector2(450, 185)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_hud_panel")
+
+[node name="TacticalHUD" type="Control" parent="CanvasLayer/MarginContainer/HUDPanel"]
+layout_mode = 2
+custom_minimum_size = Vector2(414, 157)
+mouse_filter = 2
+script = ExtResource("6_tactical_hud_script")
+
+[node name="LevelUpLayer" type="Control" parent="CanvasLayer"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Dim" type="ColorRect" parent="CanvasLayer/LevelUpLayer"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.0156863, 0.027451, 0.0509804, 0.74)
+
+[node name="CenterContainer" type="CenterContainer" parent="CanvasLayer/LevelUpLayer"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="PanelContainer" type="PanelContainer" parent="CanvasLayer/LevelUpLayer/CenterContainer"]
+custom_minimum_size = Vector2(520, 0)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_level_panel")
+
+[node name="MarginContainer" type="MarginContainer" parent="CanvasLayer/LevelUpLayer/CenterContainer/PanelContainer"]
+layout_mode = 2
+theme_override_constants/margin_left = 28
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 28
+theme_override_constants/margin_bottom = 24
+
+[node name="VBoxContainer" type="VBoxContainer" parent="CanvasLayer/LevelUpLayer/CenterContainer/PanelContainer/MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="TitleLabel" type="Label" parent="CanvasLayer/LevelUpLayer/CenterContainer/PanelContainer/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.372549, 0.968627, 0.890196, 1)
+theme_override_font_sizes/font_size = 30
+horizontal_alignment = 1
+text = "Choose an upgrade"
+
+[node name="DescriptionLabel" type="Label" parent="CanvasLayer/LevelUpLayer/CenterContainer/PanelContainer/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.85, 0.95, 0.95, 0.88)
+theme_override_font_sizes/font_size = 15
+horizontal_alignment = 1
+text = "Pick one reward"
+
+[node name="Choices" type="VBoxContainer" parent="CanvasLayer/LevelUpLayer/CenterContainer/PanelContainer/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="DamageButton" type="Button" parent="CanvasLayer/LevelUpLayer/CenterContainer/PanelContainer/MarginContainer/VBoxContainer/Choices"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 44)
+theme_override_colors/font_color = Color(0.886275, 0.980392, 0.992157, 1)
+theme_override_colors/font_hover_color = Color(1, 0.960784, 0.87451, 1)
+theme_override_colors/font_pressed_color = Color(1, 0.843137, 0.67451, 1)
+theme_override_font_sizes/font_size = 15
+theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
+theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
+text = "Damage +25%"
+
+[node name="HealthButton" type="Button" parent="CanvasLayer/LevelUpLayer/CenterContainer/PanelContainer/MarginContainer/VBoxContainer/Choices"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 44)
+theme_override_colors/font_color = Color(0.886275, 0.980392, 0.992157, 1)
+theme_override_colors/font_hover_color = Color(1, 0.960784, 0.87451, 1)
+theme_override_colors/font_pressed_color = Color(1, 0.843137, 0.67451, 1)
+theme_override_font_sizes/font_size = 15
+theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
+theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
+text = "Max Health +20 (and heal +20)"
+
+[node name="MoveSpeedButton" type="Button" parent="CanvasLayer/LevelUpLayer/CenterContainer/PanelContainer/MarginContainer/VBoxContainer/Choices"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 44)
+theme_override_colors/font_color = Color(0.886275, 0.980392, 0.992157, 1)
+theme_override_colors/font_hover_color = Color(1, 0.960784, 0.87451, 1)
+theme_override_colors/font_pressed_color = Color(1, 0.843137, 0.67451, 1)
+theme_override_font_sizes/font_size = 15
+theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
+theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
+text = "Move Speed +35"
+
+[node name="GameOverLayer" type="Control" parent="CanvasLayer"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("7_game_over_script")
+
+[node name="Dim" type="ColorRect" parent="CanvasLayer/GameOverLayer"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.01, 0.02, 0.03, 0.82)
+
+[node name="CenterContainer" type="CenterContainer" parent="CanvasLayer/GameOverLayer"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="PanelContainer" type="PanelContainer" parent="CanvasLayer/GameOverLayer/CenterContainer"]
+custom_minimum_size = Vector2(560, 0)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_gameover_panel")
+
+[node name="MarginContainer" type="MarginContainer" parent="CanvasLayer/GameOverLayer/CenterContainer/PanelContainer"]
+layout_mode = 2
+
+[node name="VBox" type="VBoxContainer" parent="CanvasLayer/GameOverLayer/CenterContainer/PanelContainer/MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="HeaderLabel" type="Label" parent="CanvasLayer/GameOverLayer/CenterContainer/PanelContainer/MarginContainer/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.28, 0.24, 1)
+theme_override_font_sizes/font_size = 46
+text = "SIGNAL LOST"
+horizontal_alignment = 1
+
+[node name="AccentBar" type="ColorRect" parent="CanvasLayer/GameOverLayer/CenterContainer/PanelContainer/MarginContainer/VBox"]
+custom_minimum_size = Vector2(0, 3)
+layout_mode = 2
+color = Color(1, 0.48, 0.24, 0.9)
+
+[node name="SubtitleLabel" type="Label" parent="CanvasLayer/GameOverLayer/CenterContainer/PanelContainer/MarginContainer/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.647059, 0.870588, 0.901961, 1)
+theme_override_font_sizes/font_size = 14
+text = "PILOT · TRANSMISSION SEVERED"
+horizontal_alignment = 1
+
+[node name="NewRecordLabel" type="Label" parent="CanvasLayer/GameOverLayer/CenterContainer/PanelContainer/MarginContainer/VBox"]
+visible = false
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.83, 0.38, 1)
+theme_override_font_sizes/font_size = 16
+text = "◆ NEW RECORD ESTABLISHED"
+horizontal_alignment = 1
+
+[node name="StatsGrid" type="GridContainer" parent="CanvasLayer/GameOverLayer/CenterContainer/PanelContainer/MarginContainer/VBox"]
+layout_mode = 2
+theme_override_constants/h_separation = 24
+theme_override_constants/v_separation = 8
+columns = 2
+
+[node name="Buttons" type="HBoxContainer" parent="CanvasLayer/GameOverLayer/CenterContainer/PanelContainer/MarginContainer/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 14
+alignment = 1
+
+[node name="RetryButton" type="Button" parent="CanvasLayer/GameOverLayer/CenterContainer/PanelContainer/MarginContainer/VBox/Buttons"]
+layout_mode = 2
+custom_minimum_size = Vector2(180, 0)
+theme_override_colors/font_color = Color(0.886275, 0.980392, 0.992157, 1)
+theme_override_colors/font_hover_color = Color(1, 0.960784, 0.87451, 1)
+theme_override_colors/font_pressed_color = Color(1, 0.843137, 0.67451, 1)
+theme_override_font_sizes/font_size = 15
+theme_override_styles/normal = SubResource("StyleBoxFlat_gameover_btn_normal")
+theme_override_styles/hover = SubResource("StyleBoxFlat_gameover_btn_hover")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_gameover_btn_pressed")
+text = "RETRY  ·  R"
+
+[node name="SignOutButton" type="Button" parent="CanvasLayer/GameOverLayer/CenterContainer/PanelContainer/MarginContainer/VBox/Buttons"]
+layout_mode = 2
+custom_minimum_size = Vector2(180, 0)
+theme_override_colors/font_color = Color(0.886275, 0.980392, 0.992157, 1)
+theme_override_colors/font_hover_color = Color(1, 0.960784, 0.87451, 1)
+theme_override_colors/font_pressed_color = Color(1, 0.843137, 0.67451, 1)
+theme_override_font_sizes/font_size = 15
+theme_override_styles/normal = SubResource("StyleBoxFlat_gameover_btn_normal")
+theme_override_styles/hover = SubResource("StyleBoxFlat_gameover_btn_hover")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_gameover_btn_pressed")
+text = "SIGN OUT  ·  ESC"
+
+[node name="PostProcessLayer" type="CanvasLayer" parent="."]
+layer = 128
+
+[node name="PostProcessRect" type="ColorRect" parent="PostProcessLayer"]
+material = SubResource("ShaderMaterial_post_process")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(1, 1, 1, 1)
+

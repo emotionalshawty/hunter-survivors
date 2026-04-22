@@ -1,0 +1,42 @@
+# Godot 4+ specific ignores
+.godot/
+.godot copy/
+.nomedia
+
+# Godot-specific ignores
+.import/
+export.cfg
+export_credentials.cfg
+
+# Imported translations (automatically generated from CSV files)
+*.translation
+
+# Mono-specific ignores
+.mono/
+data_*/
+mono_crash.*.json
+
+# iOS / Android native Firebase plugin binaries (large binary build artifacts)
+ios/
+android/
+
+# Local editor / IDE settings
+.idx/
+.idea/
+.vs/
+.vscode/
+gradle/
+claude/
+
+# OS-generated files
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Logs, swap files, and temporary files
+*.log
+*.tmp
+*.temp
+*.swp
+*.swo
+*~

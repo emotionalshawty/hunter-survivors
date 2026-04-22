@@ -1,0 +1,25 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/entities/enemy_dasher.gd" id="1_enemy_script"]
+[sub_resource type="CircleShape2D" id="1_enemy_collision"]
+radius = 12.0
+
+[node name="EnemyDasher" type="CharacterBody2D"]
+script = ExtResource("1_enemy_script")
+collision_layer = 2
+collision_mask = 3
+move_speed = 42.0
+max_health = 4.0
+contact_damage = 12.0
+xp_reward = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("1_enemy_collision")
+
+[node name="Body" type="Polygon2D" parent="."]
+color = Color(0.98, 0.42, 0.26, 1)
+polygon = PackedVector2Array(-10, -3, -2, -12, 7, -10, 13, -2, 7, 10, -4, 11, -12, 3)
+
+[node name="Eye" type="Polygon2D" parent="."]
+color = Color(1, 0.86, 0.46, 1)
+polygon = PackedVector2Array(-4, -2, 4, -2, 0, 5)

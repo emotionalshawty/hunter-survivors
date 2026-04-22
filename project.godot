@@ -17,6 +17,7 @@ config/features=PackedStringArray("4.6")
 
 [autoload]
 
+Firebase="*res://addons/godot-firebase/firebase/firebase.tscn"
 Database="*uid://bxk65vjjxugf"
 
 [editor]

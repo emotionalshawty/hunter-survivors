@@ -1,10 +1,8 @@
 extends Node
 
-const FIREBASE_URL = "https://huntersurv-2f7da-default-rtdb.europe-west1.firebasedatabase.app/"
 const FIREBASE_WEB_API_KEY = "AIzaSyA3flUW6457UE-yCenjkAhYwjQN57XCsTA"
 const AUTH_BASE_URL = "https://identitytoolkit.googleapis.com/v1/accounts:"
 const AUTH_REQUEST_TIMEOUT_SECONDS: float = 12.0
-const DATABASE_REQUEST_TIMEOUT_SECONDS: float = 10.0
 
 signal player_data_loaded(player_id: String, data: Dictionary)
 signal player_data_saved(player_id: String, data: Dictionary)
@@ -22,10 +20,7 @@ enum RequestOperation {
 	SAVE
 }
 
-var http_request: HTTPRequest
 var _pending_operation: RequestOperation = RequestOperation.NONE
-var _pending_player_id: String = ""
-var _pending_payload: Dictionary = {}
 var _queued_save_player_id: String = ""
 var _queued_save_payload: Dictionary = {}
 var _has_queued_save: bool = false
@@ -43,13 +38,8 @@ var _pending_login_success: bool = false
 var _pending_login_user_id: String = ""
 var _pending_login_email: String = ""
 
-func _ready():
-	# Create the HTTPRequest node dynamically
-	http_request = HTTPRequest.new()
-	add_child(http_request)
-	http_request.timeout = DATABASE_REQUEST_TIMEOUT_SECONDS
-	http_request.request_completed.connect(_on_request_completed)
 
+func _ready() -> void:
 	_auth_http_request = HTTPRequest.new()
 	add_child(_auth_http_request)
 	_auth_http_request.timeout = AUTH_REQUEST_TIMEOUT_SECONDS
@@ -84,6 +74,7 @@ func logout() -> void:
 	_pending_login_success = false
 	_pending_login_user_id = ""
 	_pending_login_email = ""
+	Firebase.Firestore.auth = {}
 
 
 func save_username(username: String) -> void:
@@ -187,12 +178,15 @@ func _on_auth_request_completed(result: int, response_code: int, _headers: Packe
 			emit_signal("register_failed", incomplete_message)
 		return
 
+	_sync_firestore_auth()
+
 	if operation == "login":
 		_pending_login_success = true
 		_pending_login_user_id = current_user_id
 		_pending_login_email = current_user_email
 		_load_progress_for_user(current_user_id)
-		if _pending_operation != RequestOperation.LOAD or _pending_player_id != current_user_id:
+		# If load didn't start synchronously, emit login success now.
+		if _pending_operation != RequestOperation.LOAD:
 			_emit_pending_login_success()
 	else:
 		var username_to_store := _pending_register_username
@@ -224,24 +218,23 @@ func _extract_auth_error_message(response_data: Variant) -> String:
 	return "Authentication failed."
 
 
-func _build_user_data_url(player_id: String) -> String:
-	var base_url := "%susers/%s.json" % [FIREBASE_URL, player_id]
-	if id_token.strip_edges().is_empty():
-		return base_url
-	# RTDB reliably accepts Firebase ID tokens via auth query parameter.
-	return "%s?auth=%s" % [base_url, id_token.uri_encode()]
+func _sync_firestore_auth() -> void:
+	var auth_dict := {"idtoken": id_token}
+	Firebase.Firestore.auth = auth_dict
+	for child in Firebase.Firestore.get_children():
+		if child is FirestoreCollection:
+			child.auth = auth_dict
 
 
-func _get_auth_headers(include_content_type: bool = false) -> PackedStringArray:
-	var headers := PackedStringArray(["Authorization: Bearer " + id_token])
-	if include_content_type:
-		headers.append("Content-Type: application/json")
-	return headers
+func _get_users_collection() -> FirestoreCollection:
+	_sync_firestore_auth()
+	return Firebase.Firestore.collection("users")
+
 
 # ---------------------------------------------------------
 # SAVING DATA
 # ---------------------------------------------------------
-func save_player_data(player_id: String, coins: int, max_level: int, extra_data: Dictionary = {}):
+func save_player_data(player_id: String, coins: int, max_level: int, extra_data: Dictionary = {}) -> void:
 	var data_to_save := {
 		"total_coins": coins,
 		"highest_level": max_level
@@ -256,7 +249,7 @@ func save_player_data(player_id: String, coins: int, max_level: int, extra_data:
 		data_to_save[key] = extra_data[key]
 
 	if _pending_operation != RequestOperation.NONE:
-		# Keep the most recent save request; this prevents losing important game-over stats.
+		# Keep the most recent save request; prevents losing important game-over stats.
 		_queued_save_player_id = player_id
 		_queued_save_payload = data_to_save
 		_has_queued_save = true
@@ -270,30 +263,33 @@ func _start_save_request(player_id: String, data_to_save: Dictionary) -> void:
 		return
 	if not is_authenticated():
 		emit_signal("firebase_error", "save", player_id, 401, "Not authenticated. Please log in again.")
+		_process_queued_save()
 		return
 
-	# We append .json to the URL for Firebase REST API
-	var url = _build_user_data_url(player_id)
-	
-	var json_string = JSON.stringify(data_to_save)
-	var headers := _get_auth_headers(true)
 	_pending_operation = RequestOperation.SAVE
-	_pending_player_id = player_id
-	_pending_payload = data_to_save
-	
-	# METHOD_PATCH preserves existing keys while updating only provided fields.
-	var error = http_request.request(url, headers, HTTPClient.METHOD_PATCH, json_string)
-	
-	if error != OK:
-		_reset_pending_request()
-		print("An error occurred while making the save request.")
-		emit_signal("firebase_error", "save", player_id, -1, "Failed to start save request.")
-		_process_queued_save()
+
+	var collection := _get_users_collection()
+	var doc := FirestoreDocument.new()
+	doc.collection_name = "users"
+	doc.doc_name = player_id
+	for key in data_to_save.keys():
+		doc.add_or_update_field(key, data_to_save[key])
+
+	# PATCH with updateMask preserves untouched fields, matching previous RTDB PATCH behavior.
+	var result: FirestoreDocument = await collection.update(doc)
+
+	_pending_operation = RequestOperation.NONE
+	if result != null:
+		emit_signal("player_data_saved", player_id, data_to_save)
+	else:
+		emit_signal("firebase_error", "save", player_id, -1, "Failed to save player data.")
+	_process_queued_save()
+
 
 # ---------------------------------------------------------
 # LOADING DATA
 # ---------------------------------------------------------
-func load_player_data(player_id: String):
+func load_player_data(player_id: String) -> void:
 	if _pending_operation != RequestOperation.NONE:
 		emit_signal("firebase_error", "load", player_id, -1, "A Firebase request is already in progress.")
 		return
@@ -302,85 +298,27 @@ func load_player_data(player_id: String):
 		emit_signal("player_data_loaded", player_id, {})
 		return
 
-	var url = _build_user_data_url(player_id)
 	_pending_operation = RequestOperation.LOAD
-	_pending_player_id = player_id
-	_pending_payload = {}
-	var error = http_request.request(url, _get_auth_headers(), HTTPClient.METHOD_GET)
-	
-	if error != OK:
-		_reset_pending_request()
-		print("An error occurred while making the load request.")
-		emit_signal("firebase_error", "load", player_id, -1, "Failed to start load request.")
 
-# ---------------------------------------------------------
-# HANDLING RESPONSES
-# ---------------------------------------------------------
-func _on_request_completed(result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray):
-	var operation := _pending_operation
-	var player_id := _pending_player_id
-	var payload := _pending_payload
-	_reset_pending_request()
+	var collection := _get_users_collection()
+	var doc: FirestoreDocument = await collection.get_doc(player_id)
 
-	var operation_name := "load" if operation == RequestOperation.LOAD else "save"
-	var body_text := body.get_string_from_utf8()
-
-	if result != HTTPRequest.RESULT_SUCCESS:
-		emit_signal("firebase_error", operation_name, player_id, response_code, "Network request failed.")
-		if operation == RequestOperation.LOAD and player_id == current_user_id:
-			_emit_pending_login_success()
-		_process_queued_save()
-		return
-
-	if response_code < 200 or response_code >= 300:
-		emit_signal("firebase_error", operation_name, player_id, response_code, body_text)
-		if operation == RequestOperation.LOAD and player_id == current_user_id:
-			_emit_pending_login_success()
-		_process_queued_save()
-		return
-
-	var response_data: Variant = {}
-	if not body_text.strip_edges().is_empty():
-		var json := JSON.new()
-		var parse_error := json.parse(body_text)
-		if parse_error != OK:
-			emit_signal("firebase_error", operation_name, player_id, response_code, "JSON parse error.")
-			if operation == RequestOperation.LOAD and player_id == current_user_id:
-				_emit_pending_login_success()
-			_process_queued_save()
-			return
-		response_data = json.get_data()
-
-	if operation == RequestOperation.LOAD:
-		if response_data == null:
-			if player_id == current_user_id:
-				_last_loaded_data = {}
-				current_username = ""
-			emit_signal("player_data_loaded", player_id, {})
-			if player_id == current_user_id:
-				_emit_pending_login_success()
-		elif response_data is Dictionary:
-			if player_id == current_user_id:
-				_last_loaded_data = (response_data as Dictionary).duplicate(true)
-				current_username = str((response_data as Dictionary).get("username", "")).strip_edges()
-			emit_signal("player_data_loaded", player_id, response_data)
-			if player_id == current_user_id:
-				_emit_pending_login_success()
-		else:
-			emit_signal("firebase_error", operation_name, player_id, response_code, "Unexpected response format.")
-			if player_id == current_user_id:
-				_emit_pending_login_success()
-			_process_queued_save()
-		return
-
-	emit_signal("player_data_saved", player_id, payload)
-	_process_queued_save()
-
-
-func _reset_pending_request() -> void:
 	_pending_operation = RequestOperation.NONE
-	_pending_player_id = ""
-	_pending_payload = {}
+
+	if doc == null:
+		if player_id == current_user_id:
+			_last_loaded_data = {}
+			current_username = ""
+		emit_signal("player_data_loaded", player_id, {})
+	else:
+		var data := doc.get_unsafe_document()
+		if player_id == current_user_id:
+			_last_loaded_data = data.duplicate(true)
+			current_username = str(data.get("username", "")).strip_edges()
+		emit_signal("player_data_loaded", player_id, data)
+
+	if player_id == current_user_id:
+		_emit_pending_login_success()
 
 
 func _process_queued_save() -> void:

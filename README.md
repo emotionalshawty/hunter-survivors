@@ -3,7 +3,7 @@ A Vampire Survivors-inspired 2D game built with Godot featuring online multiplay
 
 ---
 
-## 📝 Nota sobre el Historial de Commits
+##  Nota sobre el Historial de Commits
 
 | Aspecto | Descripción |
 |--------|-------------|

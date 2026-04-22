@@ -11,12 +11,12 @@ const PICKUP_COLOR := Color(0.45, 0.95, 1.0, 1.0)
 
 
 func spawn_hit(pos: Vector2, tint: Color = HIT_COLOR) -> void:
-	_burst(pos, tint, 14, 0.35, 200.0, 320.0, 1.4, 2.6, 120.0, 180.0)
+	_burst(pos, tint, 7, 0.28, 200.0, 320.0, 1.4, 2.6, 120.0, 180.0)
 
 
 func spawn_death(pos: Vector2, tint: Color = DEATH_COLOR) -> void:
-	_burst(pos, tint, 40, 0.65, 240.0, 430.0, 1.8, 3.4, 90.0, 160.0)
-	_burst(pos, DEATH_EMBER_COLOR, 18, 1.0, 80.0, 180.0, 1.0, 2.0, 30.0, 60.0)
+	_burst(pos, tint, 20, 0.55, 240.0, 430.0, 1.8, 3.4, 90.0, 160.0)
+	_burst(pos, DEATH_EMBER_COLOR, 9, 0.75, 80.0, 180.0, 1.0, 2.0, 30.0, 60.0)
 
 
 func spawn_muzzle_flash(pos: Vector2, direction: Vector2, tint: Color = MUZZLE_COLOR) -> void:
@@ -24,7 +24,7 @@ func spawn_muzzle_flash(pos: Vector2, direction: Vector2, tint: Color = MUZZLE_C
 	p.global_position = pos
 	p.one_shot = true
 	p.explosiveness = 0.95
-	p.amount = 10
+	p.amount = 5
 	p.lifetime = 0.16
 	p.direction = direction
 	p.spread = 18.0
@@ -42,11 +42,11 @@ func spawn_muzzle_flash(pos: Vector2, direction: Vector2, tint: Color = MUZZLE_C
 
 
 func spawn_pickup_absorb(pos: Vector2, tint: Color = PICKUP_COLOR) -> void:
-	_burst(pos, tint, 10, 0.45, 80.0, 140.0, 1.0, 1.8, 60.0, 100.0)
+	_burst(pos, tint, 5, 0.35, 80.0, 140.0, 1.0, 1.8, 60.0, 100.0)
 
 
 func spawn_player_hit(pos: Vector2) -> void:
-	_burst(pos, Color(1.0, 0.35, 0.35, 1.0), 22, 0.45, 120.0, 260.0, 1.4, 2.6, 80.0, 140.0)
+	_burst(pos, Color(1.0, 0.35, 0.35, 1.0), 11, 0.35, 120.0, 260.0, 1.4, 2.6, 80.0, 140.0)
 
 
 func _burst(

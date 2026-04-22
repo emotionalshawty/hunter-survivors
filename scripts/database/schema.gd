@@ -1,47 +1,25 @@
-# This file outlines the proposed Firestore database structure for the Vampsur game.
-# It's a reference for developers and not meant to be executed directly.
+# Firestore database structure reference for the VampSur game.
+# Not executed at runtime — used as developer documentation.
 
-# /players/{user_id}
+# /users/{user_id}   (document ID == Firebase Auth localId)
 #   - username: String
-#   - email: String (optional)
-#   - created_at: Timestamp
-#   - last_login: Timestamp
-#   - player_stats: Sub-collection -> /players/{user_id}/stats
+#   - total_coins: int
+#   - highest_level: int
+#   - current_level: int
+#   - current_xp: int
+#   - current_xp_to_level: int
+#   - current_health: float
+#   - max_health: float
+#   - projectile_damage_multiplier: float
+#   - move_speed: float
+#   - best_score: int
+#   - total_xp_collected: int
+#   - lifetime_deaths: int
 
-# /players/{user_id}/stats/{stats_id} (Can be a single document: "main_stats")
-#   - total_kills: Integer
-#   - total_damage_dealt: Integer
-#   - total_gold_collected: Integer
-#   - high_score: Integer
-#   - unlocked_characters: Array<String> (character_ids)
-#   - unlocked_weapons: Array<String> (weapon_ids)
-#   - achievements: Array<String> (achievement_ids)
-
-# /characters/{character_id} (Static game data)
-#   - name: String
-#   - description: String
-#   - base_health: Integer
-#   - base_speed: Float
-#   - starting_weapon: String (weapon_id)
-
-# /weapons/{weapon_id} (Static game data)
-#   - name: String
-#   - description: String
-#   - base_damage: Integer
-#   - cooldown: Float
-#   - area_of_effect: String (e.g., "circle", "line")
-#   - evolution: String (weapon_id of the evolved weapon, can be null)
-
-# /enemies/{enemy_id} (Static game data)
-#   - name: String
-#   - health: Integer
-#   - damage: Integer
-#   - speed: Float
-#   - sprite_name: String # Reference to the sprite in the project
-
-# /game_sessions/{session_id} (For multiplayer)
-#   - players: Array<String> (user_ids)
-#   - start_time: Timestamp
-#   - end_time: Timestamp (nullable)
-#   - game_state: String ("in_progress", "finished", "abandoned")
-#   - waves_survived: Integer
+# /listings/{listing_id}   (marketplace — reserved for future use)
+#   - seller_id: String       (user_id of seller)
+#   - item_type: String       (e.g. "weapon", "character")
+#   - item_id: String
+#   - price: int              (in-game coins)
+#   - listed_at: Timestamp
+#   - status: String          ("active", "sold", "cancelled")

@@ -136,9 +136,10 @@ func _find_spawn_position(player_position: Vector2, enemies_root: Node2D) -> Vec
 
 
 func _is_position_clear(candidate: Vector2, enemies_root: Node2D) -> bool:
+	var min_gap_sq: float = MIN_SPAWN_GAP * MIN_SPAWN_GAP
 	for enemy in enemies_root.get_children():
 		if not (enemy is CharacterBody2D):
 			continue
-		if enemy.global_position.distance_to(candidate) < MIN_SPAWN_GAP:
+		if enemy.global_position.distance_squared_to(candidate) < min_gap_sq:
 			return false
 	return true

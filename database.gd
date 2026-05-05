@@ -13,6 +13,8 @@ signal register_success(user_id: String, email: String)
 signal register_failed(message: String)
 signal username_saved(user_id: String, username: String)
 signal username_save_failed(message: String)
+signal leaderboard_loaded(entries: Array)
+signal leaderboard_error(message: String)
 
 enum RequestOperation {
 	NONE,
@@ -353,3 +355,68 @@ func _load_progress_for_user(player_id: String) -> void:
 	if _pending_operation != RequestOperation.NONE:
 		return
 	load_player_data(player_id)
+
+
+# ---------------------------------------------------------
+# LEADERBOARD
+# ---------------------------------------------------------
+func submit_leaderboard_entry(username: String, best_score: int) -> void:
+	if not is_authenticated():
+		emit_signal("leaderboard_error", "Not authenticated.")
+		return
+	var trimmed := username.strip_edges()
+	if trimmed.is_empty():
+		trimmed = "anonymous"
+
+	_sync_firestore_auth()
+	var collection: FirestoreCollection = Firebase.Firestore.collection("leaderboard")
+	var doc := FirestoreDocument.new()
+	doc.collection_name = "leaderboard"
+	doc.doc_name = current_user_id
+	doc.add_or_update_field("username", trimmed)
+	doc.add_or_update_field("best_score", best_score)
+	doc.add_or_update_field("last_updated", int(Time.get_unix_time_from_system()))
+	var result: FirestoreDocument = await collection.update(doc)
+	if result == null:
+		# update() fails when doc doesn't exist yet; create it.
+		result = await collection.add(current_user_id, {
+			"username": trimmed,
+			"best_score": best_score,
+			"last_updated": int(Time.get_unix_time_from_system())
+		})
+	if result == null:
+		emit_signal("leaderboard_error", "Failed to submit leaderboard entry.")
+
+
+func fetch_leaderboard(limit: int = 10) -> void:
+	if not is_authenticated():
+		emit_signal("leaderboard_error", "Not authenticated.")
+		emit_signal("leaderboard_loaded", [])
+		return
+	_sync_firestore_auth()
+	var query := FirestoreQuery.new()
+	query.from("leaderboard", false)
+	query.order_by("best_score", FirestoreQuery.DIRECTION.DESCENDING)
+	query.limit(maxi(1, limit))
+
+	var raw_result: Variant = await Firebase.Firestore.query(query)
+	if raw_result == null or not (raw_result is Array):
+		emit_signal("leaderboard_error", "Failed to fetch leaderboard.")
+		emit_signal("leaderboard_loaded", [])
+		return
+	var docs: Array = raw_result
+
+	var entries: Array = []
+	for doc in docs:
+		if doc == null:
+			continue
+		var raw: Dictionary = {}
+		if doc.has_method("get_unsafe_document"):
+			raw = doc.get_unsafe_document()
+		var entry: Dictionary = {
+			"username": str(raw.get("username", "anonymous")),
+			"best_score": int(raw.get("best_score", 0)),
+			"user_id": str(doc.doc_name)
+		}
+		entries.append(entry)
+	emit_signal("leaderboard_loaded", entries)

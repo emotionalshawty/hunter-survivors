@@ -214,7 +214,10 @@ func _list(ref : StorageReference, list_all : bool) -> Array:
 	task._url = _get_file_url(_root_ref).trim_suffix("/")
 	task.action = StorageTask.Task.TASK_LIST_ALL if list_all else StorageTask.Task.TASK_LIST
 	_process_request(task)
-	return await task.task_finished
+	var list_result: Variant = await task.task_finished
+	if list_result is Array:
+		return list_result
+	return []
 
 func _delete(ref : StorageReference) -> bool:
 	if _is_invalid_authentication():

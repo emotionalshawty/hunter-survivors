@@ -7,6 +7,7 @@
 [ext_resource type="Script" path="res://scripts/core/effects_manager.gd" id="5_effects_manager_script"]
 [ext_resource type="Script" path="res://scripts/ui/tactical_hud.gd" id="6_tactical_hud_script"]
 [ext_resource type="Script" path="res://scripts/ui/game_over_screen.gd" id="7_game_over_script"]
+[ext_resource type="Script" path="res://scripts/ui/pause_screen.gd" id="8_pause_script"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_post_process"]
 shader = ExtResource("4_post_process_shader")
@@ -396,6 +397,22 @@ theme_override_constants/h_separation = 24
 theme_override_constants/v_separation = 8
 columns = 2
 
+[node name="LeaderboardHeader" type="Label" parent="CanvasLayer/GameOverLayer/CenterContainer/PanelContainer/MarginContainer/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.372549, 0.968627, 0.890196, 1)
+theme_override_font_sizes/font_size = 14
+text = "GLOBAL LEADERBOARD"
+
+[node name="LeaderboardStatus" type="Label" parent="CanvasLayer/GameOverLayer/CenterContainer/PanelContainer/MarginContainer/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.647059, 0.870588, 0.901961, 1)
+theme_override_font_sizes/font_size = 12
+text = "Loading leaderboard..."
+
+[node name="LeaderboardList" type="VBoxContainer" parent="CanvasLayer/GameOverLayer/CenterContainer/PanelContainer/MarginContainer/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
 [node name="Buttons" type="HBoxContainer" parent="CanvasLayer/GameOverLayer/CenterContainer/PanelContainer/MarginContainer/VBox"]
 layout_mode = 2
 theme_override_constants/separation = 14
@@ -424,6 +441,127 @@ theme_override_styles/normal = SubResource("StyleBoxFlat_gameover_btn_normal")
 theme_override_styles/hover = SubResource("StyleBoxFlat_gameover_btn_hover")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_gameover_btn_pressed")
 text = "SIGN OUT  ·  ESC"
+
+[node name="PauseLayer" type="Control" parent="CanvasLayer"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("8_pause_script")
+
+[node name="Dim" type="ColorRect" parent="CanvasLayer/PauseLayer"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.01, 0.02, 0.03, 0.78)
+
+[node name="CenterContainer" type="CenterContainer" parent="CanvasLayer/PauseLayer"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="PanelContainer" type="PanelContainer" parent="CanvasLayer/PauseLayer/CenterContainer"]
+custom_minimum_size = Vector2(520, 0)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_level_panel")
+
+[node name="MarginContainer" type="MarginContainer" parent="CanvasLayer/PauseLayer/CenterContainer/PanelContainer"]
+layout_mode = 2
+theme_override_constants/margin_left = 28
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 28
+theme_override_constants/margin_bottom = 24
+
+[node name="VBox" type="VBoxContainer" parent="CanvasLayer/PauseLayer/CenterContainer/PanelContainer/MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="TitleLabel" type="Label" parent="CanvasLayer/PauseLayer/CenterContainer/PanelContainer/MarginContainer/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.372549, 0.968627, 0.890196, 1)
+theme_override_font_sizes/font_size = 30
+text = "PAUSED"
+horizontal_alignment = 1
+
+[node name="SettingsLabel" type="Label" parent="CanvasLayer/PauseLayer/CenterContainer/PanelContainer/MarginContainer/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.647059, 0.870588, 0.901961, 1)
+theme_override_font_sizes/font_size = 13
+text = "SETTINGS"
+
+[node name="Settings" type="VBoxContainer" parent="CanvasLayer/PauseLayer/CenterContainer/PanelContainer/MarginContainer/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="ShakeCheckBox" type="CheckBox" parent="CanvasLayer/PauseLayer/CenterContainer/PanelContainer/MarginContainer/VBox/Settings"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.886275, 0.980392, 0.992157, 1)
+theme_override_font_sizes/font_size = 14
+button_pressed = true
+text = "Screen shake"
+
+[node name="PostProcessCheckBox" type="CheckBox" parent="CanvasLayer/PauseLayer/CenterContainer/PanelContainer/MarginContainer/VBox/Settings"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.886275, 0.980392, 0.992157, 1)
+theme_override_font_sizes/font_size = 14
+button_pressed = true
+text = "Post-processing (CRT / bloom)"
+
+[node name="FullscreenCheckBox" type="CheckBox" parent="CanvasLayer/PauseLayer/CenterContainer/PanelContainer/MarginContainer/VBox/Settings"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.886275, 0.980392, 0.992157, 1)
+theme_override_font_sizes/font_size = 14
+text = "Fullscreen"
+
+[node name="Buttons" type="VBoxContainer" parent="CanvasLayer/PauseLayer/CenterContainer/PanelContainer/MarginContainer/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="ResumeButton" type="Button" parent="CanvasLayer/PauseLayer/CenterContainer/PanelContainer/MarginContainer/VBox/Buttons"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 44)
+theme_override_colors/font_color = Color(0.886275, 0.980392, 0.992157, 1)
+theme_override_colors/font_hover_color = Color(1, 0.960784, 0.87451, 1)
+theme_override_colors/font_pressed_color = Color(1, 0.843137, 0.67451, 1)
+theme_override_font_sizes/font_size = 15
+theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
+theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
+text = "RESUME  ·  ESC / P"
+
+[node name="RestartButton" type="Button" parent="CanvasLayer/PauseLayer/CenterContainer/PanelContainer/MarginContainer/VBox/Buttons"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 44)
+theme_override_colors/font_color = Color(0.886275, 0.980392, 0.992157, 1)
+theme_override_colors/font_hover_color = Color(1, 0.960784, 0.87451, 1)
+theme_override_colors/font_pressed_color = Color(1, 0.843137, 0.67451, 1)
+theme_override_font_sizes/font_size = 15
+theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
+theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
+text = "RESTART RUN"
+
+[node name="SignOutButton" type="Button" parent="CanvasLayer/PauseLayer/CenterContainer/PanelContainer/MarginContainer/VBox/Buttons"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 44)
+theme_override_colors/font_color = Color(0.886275, 0.980392, 0.992157, 1)
+theme_override_colors/font_hover_color = Color(1, 0.960784, 0.87451, 1)
+theme_override_colors/font_pressed_color = Color(1, 0.843137, 0.67451, 1)
+theme_override_font_sizes/font_size = 15
+theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
+theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
+text = "SIGN OUT"
 
 [node name="PostProcessLayer" type="CanvasLayer" parent="."]
 layer = 128

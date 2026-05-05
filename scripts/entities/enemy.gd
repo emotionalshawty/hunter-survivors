@@ -23,9 +23,7 @@ var _target: Node2D
 var _spawn_speed_scale: float = 1.0
 var _spawn_health_scale: float = 1.0
 
-static var _cached_enemies: Array = []
-static var _last_cache_frame: int = -1000
-const CACHE_REFRESH_FRAMES: int = 6
+static var spatial_hash: SpatialHash = null
 
 func _ready() -> void:
 	_health = max_health
@@ -83,14 +81,15 @@ func _physics_process(_delta: float) -> void:
 
 
 func _compute_separation_force() -> Vector2:
-	var enemies := _get_cached_enemies()
+	if spatial_hash == null:
+		return Vector2.ZERO
+
 	var accumulated := Vector2.ZERO
 	var neighbors := 0
 	var min_distance_squared: float = separation_radius * separation_radius
+	var candidates := spatial_hash.query_circle(global_position, separation_radius)
 
-	for enemy in enemies:
-		if not is_instance_valid(enemy):
-			continue
+	for enemy in candidates:
 		if enemy == self:
 			continue
 		if not (enemy is CharacterBody2D):
@@ -112,18 +111,6 @@ func _compute_separation_force() -> Vector2:
 		return Vector2.ZERO
 
 	return (accumulated / float(neighbors)) * separation_strength
-
-
-func _get_cached_enemies() -> Array:
-	var current_frame: int = Engine.get_process_frames()
-	if _cached_enemies.is_empty() or current_frame - _last_cache_frame >= CACHE_REFRESH_FRAMES:
-		var group_enemies := get_tree().get_nodes_in_group("enemies")
-		_cached_enemies = []
-		for enemy in group_enemies:
-			if is_instance_valid(enemy):
-				_cached_enemies.append(enemy)
-		_last_cache_frame = current_frame
-	return _cached_enemies
 
 
 func take_damage(amount: float, source_position: Vector2 = Vector2.INF, damage_kind: String = "generic") -> void:

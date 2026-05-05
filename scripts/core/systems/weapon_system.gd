@@ -127,29 +127,31 @@ func spawn_projectiles(projectile_scene: PackedScene, projectiles: Node2D, enemi
 			projectiles.add_child(projectile)
 
 
-func apply_aura_damage(delta: float, enemies: Node2D, player: CharacterBody2D) -> void:
+func apply_aura_damage(delta: float, spatial_hash: SpatialHash, player: CharacterBody2D) -> void:
 	if not aura_active:
 		return
+	if spatial_hash == null:
+		return
 	var aura_damage: float = AURA_DPS * delta
-	for enemy in enemies.get_children():
+	var nearby := spatial_hash.query_circle(player.global_position, AURA_RADIUS)
+	for enemy in nearby:
 		if not (enemy is CharacterBody2D):
 			continue
-		if enemy.global_position.distance_to(player.global_position) <= AURA_RADIUS:
-			enemy.take_damage(aura_damage, player.global_position, "aura")
+		enemy.take_damage(aura_damage, player.global_position, "aura")
 
 
-func process_chain_lightning_beam(delta: float, enemies: Node2D, origin: Vector2) -> void:
+func process_chain_lightning_beam(delta: float, spatial_hash: SpatialHash, origin: Vector2) -> void:
 	_chain_beam_has_target = false
 	_chain_beam_endpoint = origin
 	_chain_beam_points.clear()
 	_chain_beam_points.append(origin)
 	if weapon_mode != MODE_CHAIN_LIGHTNING:
 		return
-	if enemies == null:
+	if spatial_hash == null:
 		return
 
 	var used_targets: Dictionary = {}
-	var primary_target := _find_nearest_chain_target(enemies, origin, used_targets, CHAIN_FIRST_TARGET_RANGE)
+	var primary_target := _find_nearest_chain_target(spatial_hash, origin, used_targets, CHAIN_FIRST_TARGET_RANGE)
 	if primary_target == null:
 		return
 
@@ -163,7 +165,7 @@ func process_chain_lightning_beam(delta: float, enemies: Node2D, origin: Vector2
 	chain_damage *= CHAIN_DAMAGE_FALLOFF
 
 	for _jump in max(0, jumps - 1):
-		var target := _find_nearest_chain_target(enemies, current_point, used_targets, CHAIN_BOUNCE_RANGE)
+		var target := _find_nearest_chain_target(spatial_hash, current_point, used_targets, CHAIN_BOUNCE_RANGE)
 		if target == null:
 			break
 		used_targets[target.get_instance_id()] = true
@@ -175,16 +177,15 @@ func process_chain_lightning_beam(delta: float, enemies: Node2D, origin: Vector2
 	_chain_beam_endpoint = current_point
 
 
-func _find_nearest_chain_target(enemies: Node2D, from_point: Vector2, used_targets: Dictionary, max_range: float) -> CharacterBody2D:
+func _find_nearest_chain_target(spatial_hash: SpatialHash, from_point: Vector2, used_targets: Dictionary, max_range: float) -> CharacterBody2D:
 	var best_target: CharacterBody2D = null
 	var best_distance_sq: float = max_range * max_range
+	var candidates := spatial_hash.query_circle(from_point, max_range)
 
-	for enemy in enemies.get_children():
-		if not is_instance_valid(enemy):
-			continue
+	for enemy in candidates:
 		if not (enemy is CharacterBody2D):
 			continue
-		var target_id := enemy.get_instance_id()
+		var target_id: int = enemy.get_instance_id()
 		if used_targets.has(target_id):
 			continue
 

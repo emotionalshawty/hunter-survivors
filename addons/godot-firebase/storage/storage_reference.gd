@@ -136,12 +136,18 @@ func update_metadata(metadata : Dictionary) -> Variant:
 ## @return StorageTask
 ## Attempts to get the list of files and/or folders under the referenced folder This function is not nested unlike [method list_all]. Status checked this task is found in the returned [StorageTask].
 func list() -> Array:
-	return await storage._list(self, false)
+	var list_result: Variant = await storage._list(self, false)
+	if list_result is Array:
+		return list_result
+	return []
 
 ## @return StorageTask
 ## Attempts to get the list of files and/or folders under the referenced folder This function is nested unlike [method list]. Status checked this task is found in the returned [StorageTask].
 func list_all() -> Array:
-	return await storage._list(self, true)
+	var list_result: Variant = await storage._list(self, true)
+	if list_result is Array:
+		return list_result
+	return []
 
 ## @return StorageTask
 ## Attempts to delete the referenced file/folder. If successful, the reference will become invalid And can no longer be used. If you need to reference this location again, make a new reference with [method StorageTask.ref]. Status checked this task is found in the returned [StorageTask].

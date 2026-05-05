@@ -5,6 +5,8 @@ const LevelUpSystem = preload("res://scripts/core/systems/level_up_system.gd")
 const ProgressionSystem = preload("res://scripts/core/systems/progression_system.gd")
 const DatabaseLoadSystem = preload("res://scripts/core/systems/database_load_system.gd")
 const SpawnSystem = preload("res://scripts/core/systems/spawn_system.gd")
+const SpatialHashScript = preload("res://scripts/core/systems/spatial_hash.gd")
+const EnemyScript = preload("res://scripts/entities/enemy.gd")
 
 const ENEMY_SCENE: PackedScene = preload("res://scenes/entities/enemy.tscn")
 const BRUTE_ENEMY_SCENE: PackedScene = preload("res://scenes/entities/enemy_brute.tscn")
@@ -40,6 +42,8 @@ const CONTACT_DAMAGE_RADIUS: float = 30.0
 @onready var speed_upgrade_button: Button = $CanvasLayer/LevelUpLayer/CenterContainer/PanelContainer/MarginContainer/VBoxContainer/Choices/MoveSpeedButton
 @onready var aura_visual: Node2D = $Player/AuraVisual
 @onready var chain_lightning_visual: Node2D = $Player/ChainLightningVisual
+@onready var pause_layer: Control = $CanvasLayer/PauseLayer
+@onready var post_process_layer: CanvasLayer = $PostProcessLayer
 
 var score: int = 0
 var level: int = 1
@@ -66,6 +70,7 @@ var _weapon_system: WeaponSystem
 var _level_up_system: LevelUpSystem
 var _database_load_system: DatabaseLoadSystem
 var _spawn_system: SpawnSystem
+var _spatial_hash: SpatialHash
 
 func _ready() -> void:
 	if not Database.is_authenticated():
@@ -75,6 +80,8 @@ func _ready() -> void:
 	_weapon_system = WeaponSystem.new()
 	_level_up_system = LevelUpSystem.new()
 	_database_load_system = DatabaseLoadSystem.new()
+	_spatial_hash = SpatialHashScript.new(80.0)
+	EnemyScript.spatial_hash = _spatial_hash
 	_spawn_system = SpawnSystem.new(
 		ENEMY_SCENE,
 		BRUTE_ENEMY_SCENE,
@@ -97,6 +104,16 @@ func _ready() -> void:
 			game_over_layer.retry_pressed.connect(_on_retry_pressed)
 		if game_over_layer.has_signal("sign_out_pressed") and not game_over_layer.sign_out_pressed.is_connected(_on_sign_out_pressed):
 			game_over_layer.sign_out_pressed.connect(_on_sign_out_pressed)
+	if pause_layer != null:
+		if pause_layer.has_signal("resume_pressed") and not pause_layer.resume_pressed.is_connected(_on_pause_resume):
+			pause_layer.resume_pressed.connect(_on_pause_resume)
+		if pause_layer.has_signal("restart_pressed") and not pause_layer.restart_pressed.is_connected(_on_pause_restart):
+			pause_layer.restart_pressed.connect(_on_pause_restart)
+		if pause_layer.has_signal("sign_out_pressed") and not pause_layer.sign_out_pressed.is_connected(_on_pause_sign_out):
+			pause_layer.sign_out_pressed.connect(_on_pause_sign_out)
+	_apply_post_processing_setting()
+	if Settings.has_signal("settings_changed") and not Settings.settings_changed.is_connected(_apply_post_processing_setting):
+		Settings.settings_changed.connect(_apply_post_processing_setting)
 	aura_visual.call("set_enabled", false)
 	chain_lightning_visual.call("set_active", false)
 	spawn_timer.timeout.connect(_on_spawn_tick)
@@ -134,9 +151,12 @@ func _reset_run_state() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if _spatial_hash != null:
+		_spatial_hash.rebuild_from_node(enemies)
+
 	if _weapon_system != null:
-		_weapon_system.apply_aura_damage(delta, enemies, player)
-		_weapon_system.process_chain_lightning_beam(delta, enemies, player.global_position)
+		_weapon_system.apply_aura_damage(delta, _spatial_hash, player)
+		_weapon_system.process_chain_lightning_beam(delta, _spatial_hash, player.global_position)
 		_sync_aura_visual()
 		_sync_chain_lightning_visual()
 
@@ -144,20 +164,22 @@ func _physics_process(delta: float) -> void:
 	if contact_damage_cooldown > 0.0:
 		return
 
-	for enemy in enemies.get_children():
+	if _spatial_hash == null:
+		return
+	var nearby := _spatial_hash.query_circle(player.global_position, CONTACT_DAMAGE_RADIUS)
+	for enemy in nearby:
 		if not (enemy is CharacterBody2D):
 			continue
-		if enemy.global_position.distance_to(player.global_position) <= CONTACT_DAMAGE_RADIUS:
-			player_health = max(0.0, player_health - (enemy.contact_damage * CONTACT_DAMAGE_MULTIPLIER))
-			contact_damage_cooldown = CONTACT_DAMAGE_COOLDOWN
-			_shake(0.55)
-			if effects != null:
-				effects.spawn_player_hit(player.global_position)
-			_update_ui()
-			if player_health <= 0.0:
-				_shake(0.95)
-				_game_over()
-			break
+		player_health = max(0.0, player_health - (enemy.contact_damage * CONTACT_DAMAGE_MULTIPLIER))
+		contact_damage_cooldown = CONTACT_DAMAGE_COOLDOWN
+		_shake(0.55)
+		if effects != null:
+			effects.spawn_player_hit(player.global_position)
+		_update_ui()
+		if player_health <= 0.0:
+			_shake(0.95)
+			_game_over()
+		break
 
 
 func _on_spawn_tick() -> void:
@@ -190,8 +212,77 @@ func _on_enemy_damaged(world_position: Vector2, _damage_kind: String) -> void:
 
 
 func _shake(amount: float) -> void:
+	if not Settings.screen_shake_enabled:
+		return
 	if player_camera != null and player_camera.has_method("add_trauma"):
 		player_camera.add_trauma(amount)
+
+
+func _apply_post_processing_setting() -> void:
+	if post_process_layer != null:
+		post_process_layer.visible = Settings.post_processing_enabled
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not event.is_action_pressed("pause"):
+		return
+	if pause_layer == null:
+		return
+	if game_over_layer != null and game_over_layer.visible:
+		return
+	if level_up_layer != null and level_up_layer.visible:
+		return
+	if pause_layer.is_open():
+		pause_layer.close()
+	else:
+		pause_layer.open()
+	get_viewport().set_input_as_handled()
+
+
+func _on_pause_resume() -> void:
+	if pause_layer != null:
+		pause_layer.close()
+
+
+func _on_pause_restart() -> void:
+	if pause_layer != null:
+		pause_layer.close()
+	get_tree().paused = false
+	get_tree().change_scene_to_file("res://scenes/main.tscn")
+
+
+func _on_pause_sign_out() -> void:
+	if pause_layer != null:
+		pause_layer.close()
+	get_tree().paused = false
+	Database.logout()
+	get_tree().change_scene_to_file("res://scenes/ui/LoginScreen.tscn")
+
+
+func _refresh_leaderboard(is_new_best: bool, best_score_value: int) -> void:
+	if Database == null:
+		return
+	if not Database.leaderboard_loaded.is_connected(_on_leaderboard_loaded):
+		Database.leaderboard_loaded.connect(_on_leaderboard_loaded)
+	if not Database.leaderboard_error.is_connected(_on_leaderboard_error):
+		Database.leaderboard_error.connect(_on_leaderboard_error)
+
+	if is_new_best and best_score_value > 0:
+		var pilot_name: String = str(Database.current_username).strip_edges()
+		if pilot_name.is_empty():
+			pilot_name = "anonymous"
+		Database.submit_leaderboard_entry(pilot_name, best_score_value)
+	Database.fetch_leaderboard(10)
+
+
+func _on_leaderboard_loaded(entries: Array) -> void:
+	if game_over_layer != null and game_over_layer.has_method("set_leaderboard"):
+		game_over_layer.set_leaderboard(entries)
+
+
+func _on_leaderboard_error(message: String) -> void:
+	if game_over_layer != null and game_over_layer.has_method("set_leaderboard_error"):
+		game_over_layer.set_leaderboard_error(message)
 
 
 func _on_difficulty_tick() -> void:
@@ -261,6 +352,7 @@ func _game_over() -> void:
 		var pilot_name: String = str(Database.current_username).strip_edges()
 		game_over_layer.show_stats({
 			"pilot": pilot_name,
+			"user_id": player_id,
 			"score": run_score,
 			"level": run_level,
 			"kills": run_kills_total,
@@ -271,6 +363,7 @@ func _game_over() -> void:
 			"best_display": best_score,
 			"is_new_best": is_new_best,
 		})
+	_refresh_leaderboard(is_new_best, best_score)
 
 
 func _on_retry_pressed() -> void:

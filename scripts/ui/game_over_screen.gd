@@ -13,8 +13,12 @@ const ROW_SEP := Color(0.22, 0.50, 0.56, 0.35)
 @onready var subtitle_label: Label = $CenterContainer/PanelContainer/MarginContainer/VBox/SubtitleLabel
 @onready var new_record_label: Label = $CenterContainer/PanelContainer/MarginContainer/VBox/NewRecordLabel
 @onready var stats_grid: GridContainer = $CenterContainer/PanelContainer/MarginContainer/VBox/StatsGrid
+@onready var leaderboard_status: Label = $CenterContainer/PanelContainer/MarginContainer/VBox/LeaderboardStatus
+@onready var leaderboard_list: VBoxContainer = $CenterContainer/PanelContainer/MarginContainer/VBox/LeaderboardList
 @onready var retry_button: Button = $CenterContainer/PanelContainer/MarginContainer/VBox/Buttons/RetryButton
 @onready var sign_out_button: Button = $CenterContainer/PanelContainer/MarginContainer/VBox/Buttons/SignOutButton
+
+var _highlight_user_id: String = ""
 
 
 func _ready() -> void:
@@ -28,8 +32,80 @@ func _ready() -> void:
 
 func show_stats(data: Dictionary) -> void:
 	_populate(data)
+	_highlight_user_id = str(data.get("user_id", ""))
+	set_leaderboard_loading()
 	visible = true
 	retry_button.grab_focus()
+
+
+func set_leaderboard_loading() -> void:
+	if leaderboard_status != null:
+		leaderboard_status.visible = true
+		leaderboard_status.text = "Loading leaderboard..."
+	if leaderboard_list != null:
+		for child in leaderboard_list.get_children():
+			child.queue_free()
+
+
+func set_leaderboard(entries: Array) -> void:
+	if leaderboard_list == null:
+		return
+	for child in leaderboard_list.get_children():
+		child.queue_free()
+
+	if entries.is_empty():
+		if leaderboard_status != null:
+			leaderboard_status.visible = true
+			leaderboard_status.text = "No leaderboard entries yet."
+		return
+
+	if leaderboard_status != null:
+		leaderboard_status.visible = false
+
+	var rank: int = 0
+	for entry in entries:
+		rank += 1
+		_add_leaderboard_row(rank, str(entry.get("username", "anonymous")), int(entry.get("best_score", 0)), str(entry.get("user_id", "")) == _highlight_user_id)
+
+
+func set_leaderboard_error(message: String) -> void:
+	if leaderboard_list != null:
+		for child in leaderboard_list.get_children():
+			child.queue_free()
+	if leaderboard_status != null:
+		leaderboard_status.visible = true
+		leaderboard_status.text = "Leaderboard unavailable: %s" % message
+
+
+func _add_leaderboard_row(rank: int, username: String, score: int, is_self: bool) -> void:
+	var row := HBoxContainer.new()
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_theme_constant_override("separation", 12)
+
+	var rank_label := Label.new()
+	rank_label.text = "#%d" % rank
+	rank_label.custom_minimum_size = Vector2(36, 0)
+	rank_label.add_theme_font_size_override("font_size", 14)
+	rank_label.add_theme_color_override("font_color", ACCENT_GOLD if rank == 1 else LABEL_COLOR)
+
+	var name_label := Label.new()
+	name_label.text = username
+	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_label.add_theme_font_size_override("font_size", 14)
+	name_label.add_theme_color_override("font_color", ACCENT_CYAN if is_self else VALUE_COLOR)
+	if is_self:
+		name_label.text = "%s  (you)" % username
+
+	var score_label := Label.new()
+	score_label.text = str(score)
+	score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	score_label.add_theme_font_size_override("font_size", 14)
+	score_label.add_theme_color_override("font_color", ACCENT_GOLD if rank == 1 else VALUE_COLOR)
+
+	row.add_child(rank_label)
+	row.add_child(name_label)
+	row.add_child(score_label)
+	leaderboard_list.add_child(row)
 
 
 func _populate(data: Dictionary) -> void:

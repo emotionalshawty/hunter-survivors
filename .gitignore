@@ -27,6 +27,7 @@ android/
 .vscode/
 gradle/
 claude/
+.claude/
 
 # OS-generated files
 Thumbs.db

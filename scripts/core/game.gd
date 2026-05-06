@@ -74,6 +74,11 @@ var _spatial_hash: SpatialHash
 var _projectile_pool: ProjectilePool
 var _weapon_runtime: WeaponRuntime
 
+# Tracks weapons the player has acquired this run so the level-up screen
+# can offer unowned ones first.
+var _owned_weapon_modes: Array[int] = []
+var _owned_passives: Array[String] = []
+
 func _ready() -> void:
 	if not Database.is_authenticated():
 		get_tree().change_scene_to_file("res://scenes/ui/LoginScreen.tscn")
@@ -163,6 +168,9 @@ func _reset_run_state() -> void:
 	run_kills = 0
 	run_xp_gained = 0
 	run_start_ticks_ms = Time.get_ticks_msec()
+	_owned_weapon_modes.clear()
+	_owned_weapon_modes.append(WeaponSystem.MODE_NORMAL)
+	_owned_passives.clear()
 	if _level_up_system != null:
 		_level_up_system.reset()
 
@@ -171,8 +179,17 @@ func _physics_process(delta: float) -> void:
 	if _spatial_hash != null:
 		_spatial_hash.rebuild_from_node(enemies)
 
+<<<<<<< HEAD
 	if _weapon_system != null and _weapon_runtime != null:
 		_weapon_system.tick(delta, _weapon_runtime)
+=======
+	if _weapon_system != null:
+		_weapon_system.apply_aura_damage(delta, _spatial_hash, player)
+		_weapon_system.process_chain_lightning_beam(delta, _spatial_hash, player.global_position)
+		_weapon_system.update_orbit_damage(delta)
+		_sync_aura_visual()
+		_sync_chain_lightning_visual()
+>>>>>>> dcdc05faf45bd9c9ea451c8b73905604e8bfbf17
 
 	contact_damage_cooldown -= delta
 	if contact_damage_cooldown > 0.0:
@@ -466,8 +483,12 @@ func _on_firebase_error(operation: String, errored_player_id: String, response_c
 func _show_level_up_screen() -> void:
 	if _level_up_system == null:
 		return
+<<<<<<< HEAD
 	var buttons: Array = [damage_upgrade_button, health_upgrade_button, speed_upgrade_button]
 	if not _level_up_system.show_next(level, _weapon_system, level_up_layer, level_up_title_label, level_up_description_label, buttons):
+=======
+	if not _level_up_system.show_next(level, level_up_layer, level_up_title_label, level_up_description_label, damage_upgrade_button, health_upgrade_button, speed_upgrade_button, _owned_weapon_modes, _owned_passives):
+>>>>>>> dcdc05faf45bd9c9ea451c8b73905604e8bfbf17
 		return
 
 	get_tree().paused = true
@@ -484,6 +505,7 @@ func _resolve_level_up_screen() -> void:
 	get_tree().paused = false
 
 
+<<<<<<< HEAD
 func _on_offer_pressed(index: int) -> void:
 	if _level_up_system == null or not _level_up_system.active:
 		return
@@ -508,6 +530,64 @@ func _apply_offer(offer: Dictionary) -> void:
 
 
 func _apply_stat_offer(stat_id: String, value: float) -> void:
+=======
+func _on_damage_upgrade_pressed() -> void:
+	_handle_level_up_button(0, "damage")
+
+
+func _on_health_upgrade_pressed() -> void:
+	_handle_level_up_button(1, "health")
+
+
+func _on_speed_upgrade_pressed() -> void:
+	_handle_level_up_button(2, "speed")
+
+
+func _handle_level_up_button(button_index: int, stat_kind: String) -> void:
+	if _level_up_system == null or not _level_up_system.active:
+		return
+	if _level_up_system.is_weapon_choice():
+		var offer: Dictionary = _level_up_system.get_offer(button_index)
+		_apply_weapon_offer(offer)
+	else:
+		_apply_stat_upgrade(stat_kind)
+	_resolve_level_up_screen()
+
+
+func _apply_weapon_offer(offer: Dictionary) -> void:
+	if _weapon_system == null or offer.is_empty():
+		return
+	var kind: String = str(offer.get("kind", ""))
+	if kind == "active":
+		var mode: int = int(offer.get("mode", WeaponSystem.MODE_NORMAL))
+		_weapon_system.choose_weapon_mode(mode, player)
+		if not (mode in _owned_weapon_modes):
+			_owned_weapon_modes.append(mode)
+	elif kind == "passive":
+		var passive_id: String = str(offer.get("id", ""))
+		if passive_id == "aura":
+			_weapon_system.choose_aura()
+			_sync_aura_visual()
+		elif passive_id == "orbit":
+			_weapon_system.choose_orbit(PROJECTILE_SCENE, projectiles, player)
+		if not (passive_id in _owned_passives) and passive_id != "":
+			_owned_passives.append(passive_id)
+
+
+func _apply_stat_upgrade(stat_kind: String) -> void:
+	match stat_kind:
+		"damage":
+			if _weapon_system != null:
+				_weapon_system.apply_damage_upgrade()
+		"health":
+			player_max_health += HEALTH_UPGRADE_STEP
+			player_health = min(player_max_health, player_health + HEALTH_UPGRADE_STEP)
+		"speed":
+			player.speed += SPEED_UPGRADE_STEP
+
+
+func _sync_aura_visual() -> void:
+>>>>>>> dcdc05faf45bd9c9ea451c8b73905604e8bfbf17
 	if _weapon_system == null:
 		return
 	match stat_id:

@@ -370,22 +370,16 @@ func submit_leaderboard_entry(username: String, best_score: int) -> void:
 
 	_sync_firestore_auth()
 	var collection: FirestoreCollection = Firebase.Firestore.collection("leaderboard")
-	var doc := FirestoreDocument.new()
-	doc.collection_name = "leaderboard"
-	doc.doc_name = current_user_id
-	doc.add_or_update_field("username", trimmed)
-	doc.add_or_update_field("best_score", best_score)
-	doc.add_or_update_field("last_updated", int(Time.get_unix_time_from_system()))
-	var result: FirestoreDocument = await collection.update(doc)
-	if result == null:
-		# update() fails when doc doesn't exist yet; create it.
-		result = await collection.add(current_user_id, {
-			"username": trimmed,
-			"best_score": best_score,
-			"last_updated": int(Time.get_unix_time_from_system())
-		})
-	if result == null:
-		emit_signal("leaderboard_error", "Failed to submit leaderboard entry.")
+
+	# set_doc uses PATCH without updateMask — Firestore creates the document
+	# if it doesn't exist, or replaces it if it does. Works for both new and
+	# returning players without a read-before-write round trip.
+	# game.gd already guards this call with is_new_best, so no extra check needed.
+	await collection.set_doc(current_user_id, {
+		"username": trimmed,
+		"best_score": best_score,
+		"last_updated": int(Time.get_unix_time_from_system())
+	})
 
 
 func fetch_leaderboard(limit: int = 10) -> void:
@@ -394,29 +388,40 @@ func fetch_leaderboard(limit: int = 10) -> void:
 		emit_signal("leaderboard_loaded", [])
 		return
 	_sync_firestore_auth()
-	var query := FirestoreQuery.new()
-	query.from("leaderboard", false)
-	query.order_by("best_score", FirestoreQuery.DIRECTION.DESCENDING)
-	query.limit(maxi(1, limit))
 
-	var raw_result: Variant = await Firebase.Firestore.query(query)
+	# Use Firestore.list() instead of a structured query — no composite index required.
+	# We fetch up to 200 documents and sort client-side, which is fine for a
+	# leaderboard that will realistically stay in the hundreds-of-players range.
+	var raw_result: Variant = await Firebase.Firestore.list("leaderboard", 200)
 	if raw_result == null or not (raw_result is Array):
 		emit_signal("leaderboard_error", "Failed to fetch leaderboard.")
 		emit_signal("leaderboard_loaded", [])
 		return
-	var docs: Array = raw_result
 
 	var entries: Array = []
-	for doc in docs:
+	for doc in (raw_result as Array):
 		if doc == null:
+			continue
+		# list() may append a page token string as the last element — skip non-documents.
+		if not (doc is FirestoreDocument):
 			continue
 		var raw: Dictionary = {}
 		if doc.has_method("get_unsafe_document"):
 			raw = doc.get_unsafe_document()
-		var entry: Dictionary = {
+		var score: int = int(raw.get("best_score", 0))
+		if score <= 0:
+			continue
+		entries.append({
 			"username": str(raw.get("username", "anonymous")),
-			"best_score": int(raw.get("best_score", 0)),
+			"best_score": score,
 			"user_id": str(doc.doc_name)
-		}
-		entries.append(entry)
+		})
+
+	# Sort descending by best_score client-side — no index needed.
+	entries.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return int(a.get("best_score", 0)) > int(b.get("best_score", 0))
+	)
+	if entries.size() > limit:
+		entries = entries.slice(0, limit)
+
 	emit_signal("leaderboard_loaded", entries)

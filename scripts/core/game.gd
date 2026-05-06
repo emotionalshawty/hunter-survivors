@@ -7,6 +7,8 @@ const DatabaseLoadSystem = preload("res://scripts/core/systems/database_load_sys
 const SpawnSystem = preload("res://scripts/core/systems/spawn_system.gd")
 const SpatialHashScript = preload("res://scripts/core/systems/spatial_hash.gd")
 const EnemyScript = preload("res://scripts/entities/enemy.gd")
+const ProjectilePoolScript = preload("res://scripts/core/systems/projectile_pool.gd")
+const WeaponRuntimeScript = preload("res://scripts/core/weapons/weapon_runtime.gd")
 
 const ENEMY_SCENE: PackedScene = preload("res://scenes/entities/enemy.tscn")
 const BRUTE_ENEMY_SCENE: PackedScene = preload("res://scenes/entities/enemy_brute.tscn")
@@ -17,8 +19,6 @@ const GHOST_ENEMY_SCENE: PackedScene = preload("res://scenes/entities/enemy_ghos
 const PROJECTILE_SCENE: PackedScene = preload("res://scenes/entities/projectile.tscn")
 const PICKUP_SCENE: PackedScene = preload("res://scenes/entities/pickup.tscn")
 const PLAYER_START_HEALTH: float = 100.0
-const HEALTH_UPGRADE_STEP: float = 20.0
-const SPEED_UPGRADE_STEP: float = 35.0
 const PLAYER_BASE_SPEED: float = 260.0
 const CONTACT_DAMAGE_MULTIPLIER: float = 2.1
 const CONTACT_DAMAGE_COOLDOWN: float = 0.2
@@ -71,6 +71,8 @@ var _level_up_system: LevelUpSystem
 var _database_load_system: DatabaseLoadSystem
 var _spawn_system: SpawnSystem
 var _spatial_hash: SpatialHash
+var _projectile_pool: ProjectilePool
+var _weapon_runtime: WeaponRuntime
 
 func _ready() -> void:
 	if not Database.is_authenticated():
@@ -82,6 +84,19 @@ func _ready() -> void:
 	_database_load_system = DatabaseLoadSystem.new()
 	_spatial_hash = SpatialHashScript.new(80.0)
 	EnemyScript.spatial_hash = _spatial_hash
+	_projectile_pool = ProjectilePoolScript.new(PROJECTILE_SCENE)
+	_weapon_runtime = WeaponRuntimeScript.new()
+	_weapon_runtime.player = player
+	_weapon_runtime.projectiles_root = projectiles
+	_weapon_runtime.enemies_root = enemies
+	_weapon_runtime.spatial_hash = _spatial_hash
+	_weapon_runtime.projectile_pool = _projectile_pool
+	_weapon_runtime.effects = effects
+	_weapon_runtime.stats = _weapon_system.stats
+	if not _weapon_system.aura_changed.is_connected(_on_aura_changed):
+		_weapon_system.aura_changed.connect(_on_aura_changed)
+	if not _weapon_system.chain_beam_changed.is_connected(_on_chain_beam_changed):
+		_weapon_system.chain_beam_changed.connect(_on_chain_beam_changed)
 	_spawn_system = SpawnSystem.new(
 		ENEMY_SCENE,
 		BRUTE_ENEMY_SCENE,
@@ -92,10 +107,9 @@ func _ready() -> void:
 	)
 	_reset_run_state()
 	randomize()
-	player.shoot_requested.connect(_on_player_shoot_requested)
-	damage_upgrade_button.pressed.connect(_on_damage_upgrade_pressed)
-	health_upgrade_button.pressed.connect(_on_health_upgrade_pressed)
-	speed_upgrade_button.pressed.connect(_on_speed_upgrade_pressed)
+	damage_upgrade_button.pressed.connect(_on_offer_pressed.bind(0))
+	health_upgrade_button.pressed.connect(_on_offer_pressed.bind(1))
+	speed_upgrade_button.pressed.connect(_on_offer_pressed.bind(2))
 	level_up_layer.process_mode = Node.PROCESS_MODE_WHEN_PAUSED
 	level_up_layer.visible = false
 	if game_over_layer != null:
@@ -141,7 +155,10 @@ func _reset_run_state() -> void:
 	player_health = PLAYER_START_HEALTH
 	player.speed = PLAYER_BASE_SPEED
 	if _weapon_system != null:
-		_weapon_system.reset(player)
+		_weapon_system.reset()
+		# Runtime stats reference must be re-bound because reset() rebuilds the stats object.
+		if _weapon_runtime != null:
+			_weapon_runtime.stats = _weapon_system.stats
 	contact_damage_cooldown = 0.0
 	run_kills = 0
 	run_xp_gained = 0
@@ -154,11 +171,8 @@ func _physics_process(delta: float) -> void:
 	if _spatial_hash != null:
 		_spatial_hash.rebuild_from_node(enemies)
 
-	if _weapon_system != null:
-		_weapon_system.apply_aura_damage(delta, _spatial_hash, player)
-		_weapon_system.process_chain_lightning_beam(delta, _spatial_hash, player.global_position)
-		_sync_aura_visual()
-		_sync_chain_lightning_visual()
+	if _weapon_system != null and _weapon_runtime != null:
+		_weapon_system.tick(delta, _weapon_runtime)
 
 	contact_damage_cooldown -= delta
 	if contact_damage_cooldown > 0.0:
@@ -187,15 +201,6 @@ func _on_spawn_tick() -> void:
 		return
 	_spawn_system.spawn_tick(level, player, enemies, _on_enemy_defeated, enemy_speed_scale, enemy_health_scale, _on_enemy_damaged)
 	spawn_timer.wait_time = _spawn_system.compute_spawn_interval(level, enemies.get_child_count(), enemy_spawn_interval)
-
-
-func _on_player_shoot_requested(origin: Vector2, direction: Vector2) -> void:
-	if _weapon_system == null:
-		return
-	_weapon_system.spawn_projectiles(PROJECTILE_SCENE, projectiles, enemies, origin, direction)
-	if effects != null:
-		effects.spawn_muzzle_flash(origin, direction)
-	_shake(0.08)
 
 
 func _on_enemy_defeated(xp: int, _world_position: Vector2) -> void:
@@ -267,11 +272,14 @@ func _refresh_leaderboard(is_new_best: bool, best_score_value: int) -> void:
 	if not Database.leaderboard_error.is_connected(_on_leaderboard_error):
 		Database.leaderboard_error.connect(_on_leaderboard_error)
 
+	# Submit first and AWAIT it so the write is confirmed before we fetch.
+	# Without the await the fetch races the submit and shows stale data.
 	if is_new_best and best_score_value > 0:
 		var pilot_name: String = str(Database.current_username).strip_edges()
 		if pilot_name.is_empty():
 			pilot_name = "anonymous"
-		Database.submit_leaderboard_entry(pilot_name, best_score_value)
+		await Database.submit_leaderboard_entry(pilot_name, best_score_value)
+
 	Database.fetch_leaderboard(10)
 
 
@@ -433,7 +441,7 @@ func _save_progress(extra_data: Dictionary = {}) -> void:
 		return
 	var projectile_multiplier: float = 1.0
 	if _weapon_system != null:
-		projectile_multiplier = _weapon_system.projectile_damage_multiplier
+		projectile_multiplier = _weapon_system.get_damage_multiplier()
 	var payload := ProgressionSystem.make_save_payload(level, experience, experience_to_level, player_health, player_max_health, projectile_multiplier, player.speed, best_score, total_xp_collected, lifetime_deaths, extra_data)
 	database.save_player_data(player_id, total_coins, highest_level, payload)
 
@@ -458,7 +466,8 @@ func _on_firebase_error(operation: String, errored_player_id: String, response_c
 func _show_level_up_screen() -> void:
 	if _level_up_system == null:
 		return
-	if not _level_up_system.show_next(level, level_up_layer, level_up_title_label, level_up_description_label, damage_upgrade_button, health_upgrade_button, speed_upgrade_button):
+	var buttons: Array = [damage_upgrade_button, health_upgrade_button, speed_upgrade_button]
+	if not _level_up_system.show_next(level, _weapon_system, level_up_layer, level_up_title_label, level_up_description_label, buttons):
 		return
 
 	get_tree().paused = true
@@ -475,55 +484,62 @@ func _resolve_level_up_screen() -> void:
 	get_tree().paused = false
 
 
-func _on_damage_upgrade_pressed() -> void:
+func _on_offer_pressed(index: int) -> void:
 	if _level_up_system == null or not _level_up_system.active:
 		return
-	if _level_up_system.is_weapon_choice():
-		if _weapon_system != null:
-			_weapon_system.choose_chain_lightning(player)
-	else:
-		if _weapon_system != null:
-			_weapon_system.apply_damage_upgrade()
+	var offer: Dictionary = _level_up_system.get_offer(index)
+	if offer.is_empty():
+		return
+	_apply_offer(offer)
 	_resolve_level_up_screen()
 
 
-func _on_health_upgrade_pressed() -> void:
-	if _level_up_system == null or not _level_up_system.active:
-		return
-	if _level_up_system.is_weapon_choice():
-		if _weapon_system != null:
-			_weapon_system.choose_shotgun(player)
-	else:
-		player_max_health += HEALTH_UPGRADE_STEP
-		player_health = min(player_max_health, player_health + HEALTH_UPGRADE_STEP)
-	_resolve_level_up_screen()
+func _apply_offer(offer: Dictionary) -> void:
+	var kind: String = str(offer.get("kind", ""))
+	match kind:
+		"new_weapon":
+			if _weapon_system != null:
+				_weapon_system.add_weapon_by_id(str(offer.get("weapon_id", "")))
+		"level_weapon":
+			if _weapon_system != null:
+				_weapon_system.level_up_weapon_by_id(str(offer.get("weapon_id", "")))
+		"stat":
+			_apply_stat_offer(str(offer.get("stat_id", "")), float(offer.get("value", 0.0)))
 
 
-func _on_speed_upgrade_pressed() -> void:
-	if _level_up_system == null or not _level_up_system.active:
-		return
-	if _level_up_system.is_weapon_choice():
-		if _weapon_system != null:
-			_weapon_system.choose_aura()
-			_sync_aura_visual()
-	else:
-		player.speed += SPEED_UPGRADE_STEP
-	_resolve_level_up_screen()
-
-
-func _sync_aura_visual() -> void:
+func _apply_stat_offer(stat_id: String, value: float) -> void:
 	if _weapon_system == null:
-		aura_visual.call("set_enabled", false)
 		return
-	aura_visual.call("set_radius", _weapon_system.get_aura_radius())
-	aura_visual.call("set_enabled", _weapon_system.is_aura_active())
+	match stat_id:
+		"damage":
+			_weapon_system.stats.damage_multiplier += value
+		"fire_rate":
+			_weapon_system.stats.fire_rate_multiplier += value
+		"pierce":
+			_weapon_system.stats.pierce_bonus += int(value)
+		"crit":
+			_weapon_system.stats.crit_chance = clampf(_weapon_system.stats.crit_chance + value, 0.0, 1.0)
+		"max_health":
+			player_max_health += value
+			player_health = min(player_max_health, player_health + value)
+		"move_speed":
+			player.speed += value
 
 
-func _sync_chain_lightning_visual() -> void:
-	if _weapon_system == null:
+func _on_aura_changed(radius: float, active: bool) -> void:
+	if aura_visual == null:
+		return
+	aura_visual.call("set_radius", radius)
+	aura_visual.call("set_enabled", active)
+
+
+func _on_chain_beam_changed(points: Array, active: bool) -> void:
+	if chain_lightning_visual == null:
+		return
+	if not active or points.size() < 2:
 		chain_lightning_visual.call("set_active", false)
 		return
-	if not _weapon_system.has_chain_beam_points():
-		chain_lightning_visual.call("set_active", false)
-		return
-	chain_lightning_visual.call("set_chain_points", _weapon_system.get_chain_beam_points(), true)
+	var typed_points: Array[Vector2] = []
+	for p in points:
+		typed_points.append(p as Vector2)
+	chain_lightning_visual.call("set_chain_points", typed_points, true)

@@ -76,7 +76,7 @@ func _on_login_success(_user_id: String, email: String) -> void:
 		status_label.text = "Welcome"
 	else:
 		status_label.text = "Welcome %s" % username
-	get_tree().change_scene_to_file("res://scenes/main.tscn")
+	get_tree().change_scene_to_file("res://scenes/ui/MainMenu.tscn")
 
 
 func _on_login_failed(message: String) -> void:
@@ -91,7 +91,7 @@ func _on_register_success(_user_id: String, email: String) -> void:
 		status_label.text = "Account created for %s. You are now logged in." % email
 	else:
 		status_label.text = "Account created. Welcome %s" % Database.current_username
-	get_tree().change_scene_to_file("res://scenes/main.tscn")
+	get_tree().change_scene_to_file("res://scenes/ui/MainMenu.tscn")
 
 
 func _on_register_failed(message: String) -> void:

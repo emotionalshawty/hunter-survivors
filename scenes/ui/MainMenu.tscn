@@ -1,0 +1,397 @@
+[gd_scene load_steps=10 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/main_menu.gd" id="1_main_menu_script"]
+[ext_resource type="Script" path="res://scripts/ui/login_backdrop.gd" id="2_backdrop_script"]
+[ext_resource type="Shader" path="res://shaders/post_process.gdshader" id="3_post_process_shader"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_post_process"]
+shader = ExtResource("3_post_process_shader")
+shader_parameter/chromatic_aberration = 1.4
+shader_parameter/vignette_strength = 1.05
+shader_parameter/vignette_radius = 0.85
+shader_parameter/grain_strength = 0.05
+shader_parameter/bloom_strength = 0.85
+shader_parameter/bloom_threshold = 0.6
+shader_parameter/scanline_strength = 0.04
+shader_parameter/exposure = 1.0
+shader_parameter/contrast = 1.1
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
+bg_color = Color(0.0313726, 0.0509804, 0.0823529, 0.93)
+border_color = Color(0.372549, 0.968627, 0.890196, 0.36)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+corner_radius_top_left = 16
+corner_radius_top_right = 16
+corner_radius_bottom_right = 16
+corner_radius_bottom_left = 16
+shadow_color = Color(0.00784314, 0.0117647, 0.0352941, 0.52)
+shadow_size = 22
+content_margin_left = 18
+content_margin_top = 14
+content_margin_right = 18
+content_margin_bottom = 14
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_subpanel"]
+bg_color = Color(0.0235294, 0.0431373, 0.0666667, 0.85)
+border_color = Color(0.372549, 0.968627, 0.890196, 0.22)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+content_margin_left = 16
+content_margin_top = 12
+content_margin_right = 16
+content_margin_bottom = 12
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button_normal"]
+bg_color = Color(0.0352941, 0.0862745, 0.121569, 0.95)
+border_color = Color(0.372549, 0.968627, 0.890196, 0.46)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button_hover"]
+bg_color = Color(0.0627451, 0.145098, 0.196078, 0.97)
+border_color = Color(0.988235, 0.627451, 0.313726, 0.72)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button_pressed"]
+bg_color = Color(0.133333, 0.0901961, 0.0745098, 0.98)
+border_color = Color(0.976471, 0.478431, 0.239216, 0.9)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[node name="MainMenu" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_main_menu_script")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.0156863, 0.027451, 0.0470588, 1)
+
+[node name="Backdrop" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("2_backdrop_script")
+
+[node name="MainPanel" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="StatsPanel" type="PanelContainer" parent="MainPanel"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 80.0
+offset_top = 110.0
+offset_right = 380.0
+offset_bottom = 110.0
+grow_horizontal = 1
+grow_vertical = 1
+custom_minimum_size = Vector2(300, 0)
+theme_override_styles/panel = SubResource("StyleBoxFlat_subpanel")
+
+[node name="Margin" type="MarginContainer" parent="MainPanel/StatsPanel"]
+layout_mode = 2
+
+[node name="VBox" type="VBoxContainer" parent="MainPanel/StatsPanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="SectionLabel" type="Label" parent="MainPanel/StatsPanel/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.372549, 0.968627, 0.890196, 1)
+theme_override_font_sizes/font_size = 14
+text = "PILOT STATISTICS"
+
+[node name="PilotNameValue" type="Label" parent="MainPanel/StatsPanel/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.94, 0.98, 0.98, 1)
+theme_override_font_sizes/font_size = 22
+text = "ANONYMOUS"
+
+[node name="StatsGrid" type="GridContainer" parent="MainPanel/StatsPanel/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/h_separation = 24
+theme_override_constants/v_separation = 6
+columns = 2
+
+[node name="LeaderboardPanel" type="PanelContainer" parent="MainPanel"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 0.0
+offset_left = -380.0
+offset_top = 110.0
+offset_right = -80.0
+offset_bottom = 110.0
+grow_horizontal = 1
+grow_vertical = 1
+custom_minimum_size = Vector2(300, 0)
+theme_override_styles/panel = SubResource("StyleBoxFlat_subpanel")
+
+[node name="Margin" type="MarginContainer" parent="MainPanel/LeaderboardPanel"]
+layout_mode = 2
+
+[node name="VBox" type="VBoxContainer" parent="MainPanel/LeaderboardPanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="SectionLabel" type="Label" parent="MainPanel/LeaderboardPanel/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.372549, 0.968627, 0.890196, 1)
+theme_override_font_sizes/font_size = 14
+text = "GLOBAL LEADERBOARD"
+
+[node name="LeaderboardStatus" type="Label" parent="MainPanel/LeaderboardPanel/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.647059, 0.870588, 0.901961, 1)
+theme_override_font_sizes/font_size = 12
+text = "Loading top operators..."
+
+[node name="LeaderboardList" type="VBoxContainer" parent="MainPanel/LeaderboardPanel/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="CenterColumn" type="CenterContainer" parent="MainPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="CenterStack" type="VBoxContainer" parent="MainPanel/CenterColumn"]
+layout_mode = 2
+custom_minimum_size = Vector2(280, 0)
+theme_override_constants/separation = 14
+alignment = 1
+
+[node name="HeaderLabel" type="Label" parent="MainPanel/CenterColumn/CenterStack"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.372549, 0.968627, 0.890196, 1)
+theme_override_font_sizes/font_size = 52
+text = "VAMPSUR"
+horizontal_alignment = 1
+
+[node name="SubtitleLabel" type="Label" parent="MainPanel/CenterColumn/CenterStack"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.647059, 0.870588, 0.901961, 1)
+theme_override_font_sizes/font_size = 12
+text = "OPERATIONS COMMAND · SELECT ACTION"
+horizontal_alignment = 1
+
+[node name="AccentBar" type="ColorRect" parent="MainPanel/CenterColumn/CenterStack"]
+custom_minimum_size = Vector2(0, 2)
+layout_mode = 2
+color = Color(0.976471, 0.478431, 0.239216, 0.65)
+
+[node name="Spacer" type="Control" parent="MainPanel/CenterColumn/CenterStack"]
+custom_minimum_size = Vector2(0, 8)
+layout_mode = 2
+
+[node name="PlayButton" type="Button" parent="MainPanel/CenterColumn/CenterStack"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 56)
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.886275, 0.980392, 0.992157, 1)
+theme_override_colors/font_hover_color = Color(1, 0.960784, 0.87451, 1)
+theme_override_colors/font_pressed_color = Color(1, 0.843137, 0.67451, 1)
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
+theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
+text = "PLAY"
+
+[node name="SettingsButton" type="Button" parent="MainPanel/CenterColumn/CenterStack"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 44)
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.886275, 0.980392, 0.992157, 1)
+theme_override_colors/font_hover_color = Color(1, 0.960784, 0.87451, 1)
+theme_override_colors/font_pressed_color = Color(1, 0.843137, 0.67451, 1)
+theme_override_font_sizes/font_size = 16
+theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
+theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
+text = "SETTINGS"
+
+[node name="SignOutButton" type="Button" parent="MainPanel/CenterColumn/CenterStack"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 44)
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.886275, 0.980392, 0.992157, 1)
+theme_override_colors/font_hover_color = Color(1, 0.960784, 0.87451, 1)
+theme_override_colors/font_pressed_color = Color(1, 0.843137, 0.67451, 1)
+theme_override_font_sizes/font_size = 16
+theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
+theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
+text = "SIGN OUT"
+
+[node name="ExitButton" type="Button" parent="MainPanel/CenterColumn/CenterStack"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 44)
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.886275, 0.980392, 0.992157, 1)
+theme_override_colors/font_hover_color = Color(1, 0.960784, 0.87451, 1)
+theme_override_colors/font_pressed_color = Color(1, 0.843137, 0.67451, 1)
+theme_override_font_sizes/font_size = 16
+theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
+theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
+text = "EXIT"
+
+[node name="SettingsPanel" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Dim" type="ColorRect" parent="SettingsPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.01, 0.02, 0.03, 0.78)
+
+[node name="CenterContainer" type="CenterContainer" parent="SettingsPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="PanelContainer" type="PanelContainer" parent="SettingsPanel/CenterContainer"]
+custom_minimum_size = Vector2(440, 0)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
+
+[node name="Margin" type="MarginContainer" parent="SettingsPanel/CenterContainer/PanelContainer"]
+layout_mode = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 22
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 22
+
+[node name="VBox" type="VBoxContainer" parent="SettingsPanel/CenterContainer/PanelContainer/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="TitleLabel" type="Label" parent="SettingsPanel/CenterContainer/PanelContainer/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.372549, 0.968627, 0.890196, 1)
+theme_override_font_sizes/font_size = 26
+text = "SETTINGS"
+horizontal_alignment = 1
+
+[node name="SectionLabel" type="Label" parent="SettingsPanel/CenterContainer/PanelContainer/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.647059, 0.870588, 0.901961, 1)
+theme_override_font_sizes/font_size = 12
+text = "VIDEO"
+
+[node name="Settings" type="VBoxContainer" parent="SettingsPanel/CenterContainer/PanelContainer/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="ShakeCheckBox" type="CheckBox" parent="SettingsPanel/CenterContainer/PanelContainer/Margin/VBox/Settings"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.886275, 0.980392, 0.992157, 1)
+theme_override_font_sizes/font_size = 14
+button_pressed = true
+text = "Screen shake"
+
+[node name="PostProcessCheckBox" type="CheckBox" parent="SettingsPanel/CenterContainer/PanelContainer/Margin/VBox/Settings"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.886275, 0.980392, 0.992157, 1)
+theme_override_font_sizes/font_size = 14
+button_pressed = true
+text = "Post-processing (CRT / bloom)"
+
+[node name="FullscreenCheckBox" type="CheckBox" parent="SettingsPanel/CenterContainer/PanelContainer/Margin/VBox/Settings"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.886275, 0.980392, 0.992157, 1)
+theme_override_font_sizes/font_size = 14
+text = "Fullscreen"
+
+[node name="BackButton" type="Button" parent="SettingsPanel/CenterContainer/PanelContainer/Margin/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 44)
+theme_override_colors/font_color = Color(0.886275, 0.980392, 0.992157, 1)
+theme_override_colors/font_hover_color = Color(1, 0.960784, 0.87451, 1)
+theme_override_colors/font_pressed_color = Color(1, 0.843137, 0.67451, 1)
+theme_override_font_sizes/font_size = 15
+theme_override_styles/normal = SubResource("StyleBoxFlat_button_normal")
+theme_override_styles/hover = SubResource("StyleBoxFlat_button_hover")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_button_pressed")
+text = "BACK  ·  ESC"
+
+[node name="PostProcessLayer" type="CanvasLayer" parent="."]
+layer = 128
+
+[node name="PostProcessRect" type="ColorRect" parent="PostProcessLayer"]
+material = SubResource("ShaderMaterial_post_process")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(1, 1, 1, 1)

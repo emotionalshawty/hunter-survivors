@@ -7,8 +7,6 @@ const DatabaseLoadSystem = preload("res://scripts/core/systems/database_load_sys
 const SpawnSystem = preload("res://scripts/core/systems/spawn_system.gd")
 const SpatialHashScript = preload("res://scripts/core/systems/spatial_hash.gd")
 const EnemyScript = preload("res://scripts/entities/enemy.gd")
-const ProjectilePoolScript = preload("res://scripts/core/systems/projectile_pool.gd")
-const WeaponRuntimeScript = preload("res://scripts/core/weapons/weapon_runtime.gd")
 
 const ENEMY_SCENE: PackedScene = preload("res://scenes/entities/enemy.tscn")
 const BRUTE_ENEMY_SCENE: PackedScene = preload("res://scenes/entities/enemy_brute.tscn")
@@ -19,6 +17,8 @@ const GHOST_ENEMY_SCENE: PackedScene = preload("res://scenes/entities/enemy_ghos
 const PROJECTILE_SCENE: PackedScene = preload("res://scenes/entities/projectile.tscn")
 const PICKUP_SCENE: PackedScene = preload("res://scenes/entities/pickup.tscn")
 const PLAYER_START_HEALTH: float = 100.0
+const HEALTH_UPGRADE_STEP: float = 20.0
+const SPEED_UPGRADE_STEP: float = 35.0
 const PLAYER_BASE_SPEED: float = 260.0
 const CONTACT_DAMAGE_MULTIPLIER: float = 2.1
 const CONTACT_DAMAGE_COOLDOWN: float = 0.2
@@ -71,8 +71,6 @@ var _level_up_system: LevelUpSystem
 var _database_load_system: DatabaseLoadSystem
 var _spawn_system: SpawnSystem
 var _spatial_hash: SpatialHash
-var _projectile_pool: ProjectilePool
-var _weapon_runtime: WeaponRuntime
 
 # Tracks weapons the player has acquired this run so the level-up screen
 # can offer unowned ones first.
@@ -89,19 +87,6 @@ func _ready() -> void:
 	_database_load_system = DatabaseLoadSystem.new()
 	_spatial_hash = SpatialHashScript.new(80.0)
 	EnemyScript.spatial_hash = _spatial_hash
-	_projectile_pool = ProjectilePoolScript.new(PROJECTILE_SCENE)
-	_weapon_runtime = WeaponRuntimeScript.new()
-	_weapon_runtime.player = player
-	_weapon_runtime.projectiles_root = projectiles
-	_weapon_runtime.enemies_root = enemies
-	_weapon_runtime.spatial_hash = _spatial_hash
-	_weapon_runtime.projectile_pool = _projectile_pool
-	_weapon_runtime.effects = effects
-	_weapon_runtime.stats = _weapon_system.stats
-	if not _weapon_system.aura_changed.is_connected(_on_aura_changed):
-		_weapon_system.aura_changed.connect(_on_aura_changed)
-	if not _weapon_system.chain_beam_changed.is_connected(_on_chain_beam_changed):
-		_weapon_system.chain_beam_changed.connect(_on_chain_beam_changed)
 	_spawn_system = SpawnSystem.new(
 		ENEMY_SCENE,
 		BRUTE_ENEMY_SCENE,
@@ -112,9 +97,10 @@ func _ready() -> void:
 	)
 	_reset_run_state()
 	randomize()
-	damage_upgrade_button.pressed.connect(_on_offer_pressed.bind(0))
-	health_upgrade_button.pressed.connect(_on_offer_pressed.bind(1))
-	speed_upgrade_button.pressed.connect(_on_offer_pressed.bind(2))
+	player.shoot_requested.connect(_on_player_shoot_requested)
+	damage_upgrade_button.pressed.connect(_on_damage_upgrade_pressed)
+	health_upgrade_button.pressed.connect(_on_health_upgrade_pressed)
+	speed_upgrade_button.pressed.connect(_on_speed_upgrade_pressed)
 	level_up_layer.process_mode = Node.PROCESS_MODE_WHEN_PAUSED
 	level_up_layer.visible = false
 	if game_over_layer != null:
@@ -123,6 +109,8 @@ func _ready() -> void:
 			game_over_layer.retry_pressed.connect(_on_retry_pressed)
 		if game_over_layer.has_signal("sign_out_pressed") and not game_over_layer.sign_out_pressed.is_connected(_on_sign_out_pressed):
 			game_over_layer.sign_out_pressed.connect(_on_sign_out_pressed)
+		if game_over_layer.has_signal("main_menu_pressed") and not game_over_layer.main_menu_pressed.is_connected(_on_game_over_main_menu):
+			game_over_layer.main_menu_pressed.connect(_on_game_over_main_menu)
 	if pause_layer != null:
 		if pause_layer.has_signal("resume_pressed") and not pause_layer.resume_pressed.is_connected(_on_pause_resume):
 			pause_layer.resume_pressed.connect(_on_pause_resume)
@@ -130,6 +118,8 @@ func _ready() -> void:
 			pause_layer.restart_pressed.connect(_on_pause_restart)
 		if pause_layer.has_signal("sign_out_pressed") and not pause_layer.sign_out_pressed.is_connected(_on_pause_sign_out):
 			pause_layer.sign_out_pressed.connect(_on_pause_sign_out)
+		if pause_layer.has_signal("main_menu_pressed") and not pause_layer.main_menu_pressed.is_connected(_on_pause_main_menu):
+			pause_layer.main_menu_pressed.connect(_on_pause_main_menu)
 	_apply_post_processing_setting()
 	if Settings.has_signal("settings_changed") and not Settings.settings_changed.is_connected(_apply_post_processing_setting):
 		Settings.settings_changed.connect(_apply_post_processing_setting)
@@ -160,10 +150,7 @@ func _reset_run_state() -> void:
 	player_health = PLAYER_START_HEALTH
 	player.speed = PLAYER_BASE_SPEED
 	if _weapon_system != null:
-		_weapon_system.reset()
-		# Runtime stats reference must be re-bound because reset() rebuilds the stats object.
-		if _weapon_runtime != null:
-			_weapon_runtime.stats = _weapon_system.stats
+		_weapon_system.reset(player)
 	contact_damage_cooldown = 0.0
 	run_kills = 0
 	run_xp_gained = 0
@@ -179,17 +166,12 @@ func _physics_process(delta: float) -> void:
 	if _spatial_hash != null:
 		_spatial_hash.rebuild_from_node(enemies)
 
-<<<<<<< HEAD
-	if _weapon_system != null and _weapon_runtime != null:
-		_weapon_system.tick(delta, _weapon_runtime)
-=======
 	if _weapon_system != null:
 		_weapon_system.apply_aura_damage(delta, _spatial_hash, player)
 		_weapon_system.process_chain_lightning_beam(delta, _spatial_hash, player.global_position)
 		_weapon_system.update_orbit_damage(delta)
 		_sync_aura_visual()
 		_sync_chain_lightning_visual()
->>>>>>> dcdc05faf45bd9c9ea451c8b73905604e8bfbf17
 
 	contact_damage_cooldown -= delta
 	if contact_damage_cooldown > 0.0:
@@ -279,6 +261,13 @@ func _on_pause_sign_out() -> void:
 	get_tree().paused = false
 	Database.logout()
 	get_tree().change_scene_to_file("res://scenes/ui/LoginScreen.tscn")
+
+
+func _on_pause_main_menu() -> void:
+	if pause_layer != null:
+		pause_layer.close()
+	get_tree().paused = false
+	get_tree().change_scene_to_file("res://scenes/ui/MainMenu.tscn")
 
 
 func _refresh_leaderboard(is_new_best: bool, best_score_value: int) -> void:
@@ -398,7 +387,13 @@ func _on_retry_pressed() -> void:
 
 func _on_sign_out_pressed() -> void:
 	get_tree().paused = false
+	Database.logout()
 	get_tree().change_scene_to_file("res://scenes/ui/LoginScreen.tscn")
+
+
+func _on_game_over_main_menu() -> void:
+	get_tree().paused = false
+	get_tree().change_scene_to_file("res://scenes/ui/MainMenu.tscn")
 
 
 func _spawn_pickup(xp: int, world_position: Vector2) -> void:
@@ -483,12 +478,7 @@ func _on_firebase_error(operation: String, errored_player_id: String, response_c
 func _show_level_up_screen() -> void:
 	if _level_up_system == null:
 		return
-<<<<<<< HEAD
-	var buttons: Array = [damage_upgrade_button, health_upgrade_button, speed_upgrade_button]
-	if not _level_up_system.show_next(level, _weapon_system, level_up_layer, level_up_title_label, level_up_description_label, buttons):
-=======
 	if not _level_up_system.show_next(level, level_up_layer, level_up_title_label, level_up_description_label, damage_upgrade_button, health_upgrade_button, speed_upgrade_button, _owned_weapon_modes, _owned_passives):
->>>>>>> dcdc05faf45bd9c9ea451c8b73905604e8bfbf17
 		return
 
 	get_tree().paused = true
@@ -505,32 +495,6 @@ func _resolve_level_up_screen() -> void:
 	get_tree().paused = false
 
 
-<<<<<<< HEAD
-func _on_offer_pressed(index: int) -> void:
-	if _level_up_system == null or not _level_up_system.active:
-		return
-	var offer: Dictionary = _level_up_system.get_offer(index)
-	if offer.is_empty():
-		return
-	_apply_offer(offer)
-	_resolve_level_up_screen()
-
-
-func _apply_offer(offer: Dictionary) -> void:
-	var kind: String = str(offer.get("kind", ""))
-	match kind:
-		"new_weapon":
-			if _weapon_system != null:
-				_weapon_system.add_weapon_by_id(str(offer.get("weapon_id", "")))
-		"level_weapon":
-			if _weapon_system != null:
-				_weapon_system.level_up_weapon_by_id(str(offer.get("weapon_id", "")))
-		"stat":
-			_apply_stat_offer(str(offer.get("stat_id", "")), float(offer.get("value", 0.0)))
-
-
-func _apply_stat_offer(stat_id: String, value: float) -> void:
-=======
 func _on_damage_upgrade_pressed() -> void:
 	_handle_level_up_button(0, "damage")
 
@@ -587,39 +551,27 @@ func _apply_stat_upgrade(stat_kind: String) -> void:
 
 
 func _sync_aura_visual() -> void:
->>>>>>> dcdc05faf45bd9c9ea451c8b73905604e8bfbf17
 	if _weapon_system == null:
+		aura_visual.call("set_enabled", false)
 		return
-	match stat_id:
-		"damage":
-			_weapon_system.stats.damage_multiplier += value
-		"fire_rate":
-			_weapon_system.stats.fire_rate_multiplier += value
-		"pierce":
-			_weapon_system.stats.pierce_bonus += int(value)
-		"crit":
-			_weapon_system.stats.crit_chance = clampf(_weapon_system.stats.crit_chance + value, 0.0, 1.0)
-		"max_health":
-			player_max_health += value
-			player_health = min(player_max_health, player_health + value)
-		"move_speed":
-			player.speed += value
+	aura_visual.call("set_radius", _weapon_system.get_aura_radius())
+	aura_visual.call("set_enabled", _weapon_system.is_aura_active())
 
 
-func _on_aura_changed(radius: float, active: bool) -> void:
-	if aura_visual == null:
-		return
-	aura_visual.call("set_radius", radius)
-	aura_visual.call("set_enabled", active)
-
-
-func _on_chain_beam_changed(points: Array, active: bool) -> void:
-	if chain_lightning_visual == null:
-		return
-	if not active or points.size() < 2:
+func _sync_chain_lightning_visual() -> void:
+	if _weapon_system == null:
 		chain_lightning_visual.call("set_active", false)
 		return
-	var typed_points: Array[Vector2] = []
-	for p in points:
-		typed_points.append(p as Vector2)
-	chain_lightning_visual.call("set_chain_points", typed_points, true)
+	if not _weapon_system.has_chain_beam_points():
+		chain_lightning_visual.call("set_active", false)
+		return
+	chain_lightning_visual.call("set_chain_points", _weapon_system.get_chain_beam_points(), true)
+
+
+func _on_player_shoot_requested(origin: Vector2, direction: Vector2) -> void:
+	if _weapon_system == null:
+		return
+	_weapon_system.spawn_projectiles(PROJECTILE_SCENE, projectiles, enemies, origin, direction)
+	if effects != null:
+		effects.spawn_muzzle_flash(origin, direction)
+	_shake(0.08)

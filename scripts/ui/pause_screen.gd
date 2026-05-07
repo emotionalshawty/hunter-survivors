@@ -3,10 +3,12 @@ extends Control
 signal resume_pressed
 signal sign_out_pressed
 signal restart_pressed
+signal main_menu_pressed
 
 @onready var resume_button: Button = $CenterContainer/PanelContainer/MarginContainer/VBox/Buttons/ResumeButton
 @onready var restart_button: Button = $CenterContainer/PanelContainer/MarginContainer/VBox/Buttons/RestartButton
 @onready var sign_out_button: Button = $CenterContainer/PanelContainer/MarginContainer/VBox/Buttons/SignOutButton
+@onready var main_menu_button: Button = $CenterContainer/PanelContainer/MarginContainer/VBox/Buttons/MainMenuButton
 @onready var shake_checkbox: CheckBox = $CenterContainer/PanelContainer/MarginContainer/VBox/Settings/ShakeCheckBox
 @onready var post_processing_checkbox: CheckBox = $CenterContainer/PanelContainer/MarginContainer/VBox/Settings/PostProcessCheckBox
 @onready var fullscreen_checkbox: CheckBox = $CenterContainer/PanelContainer/MarginContainer/VBox/Settings/FullscreenCheckBox
@@ -18,6 +20,8 @@ func _ready() -> void:
 	resume_button.pressed.connect(_on_resume_pressed)
 	restart_button.pressed.connect(func() -> void: restart_pressed.emit())
 	sign_out_button.pressed.connect(func() -> void: sign_out_pressed.emit())
+	if main_menu_button != null:
+		main_menu_button.pressed.connect(func() -> void: main_menu_pressed.emit())
 	shake_checkbox.toggled.connect(Settings.set_screen_shake)
 	post_processing_checkbox.toggled.connect(Settings.set_post_processing)
 	fullscreen_checkbox.toggled.connect(Settings.set_fullscreen)

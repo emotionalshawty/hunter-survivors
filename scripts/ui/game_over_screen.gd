@@ -2,6 +2,7 @@ extends Control
 
 signal retry_pressed
 signal sign_out_pressed
+signal main_menu_pressed
 
 const LABEL_COLOR := Color(0.62, 0.86, 0.90, 1.0)
 const VALUE_COLOR := Color(0.94, 0.98, 0.98, 1.0)
@@ -16,6 +17,7 @@ const ROW_SEP := Color(0.22, 0.50, 0.56, 0.35)
 @onready var leaderboard_status: Label = $CenterContainer/PanelContainer/MarginContainer/VBox/LeaderboardStatus
 @onready var leaderboard_list: VBoxContainer = $CenterContainer/PanelContainer/MarginContainer/VBox/LeaderboardList
 @onready var retry_button: Button = $CenterContainer/PanelContainer/MarginContainer/VBox/Buttons/RetryButton
+@onready var main_menu_button: Button = $CenterContainer/PanelContainer/MarginContainer/VBox/Buttons/MainMenuButton
 @onready var sign_out_button: Button = $CenterContainer/PanelContainer/MarginContainer/VBox/Buttons/SignOutButton
 
 var _highlight_user_id: String = ""
@@ -26,6 +28,8 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	retry_button.pressed.connect(func() -> void: retry_pressed.emit())
 	sign_out_button.pressed.connect(func() -> void: sign_out_pressed.emit())
+	if main_menu_button != null:
+		main_menu_button.pressed.connect(func() -> void: main_menu_pressed.emit())
 	if new_record_label != null:
 		new_record_label.visible = false
 

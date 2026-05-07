@@ -31,7 +31,6 @@ var _has_returned: bool = false
 var _orbit_damage_cooldowns: Dictionary = {}
 
 
-
 func _ready() -> void:
 	if not body_entered.is_connected(_on_body_entered):
 		body_entered.connect(_on_body_entered)
@@ -41,12 +40,10 @@ func _ready() -> void:
 func reset_for_acquire() -> void:
 	rotation = direction.angle() + PI * 0.5
 	_remaining_pierce = max(1, pierce_count)
-<<<<<<< HEAD
 	_hit_targets.clear()
-=======
 	_initial_lifetime = lifetime
-	body_entered.connect(_on_body_entered)
->>>>>>> dcdc05faf45bd9c9ea451c8b73905604e8bfbf17
+	_has_returned = false
+	_orbit_damage_cooldowns.clear()
 
 
 func _process(delta: float) -> void:
@@ -62,18 +59,14 @@ func _process(delta: float) -> void:
 		_flip_toward_player()
 
 	if lifetime <= 0.0:
-<<<<<<< HEAD
-		_release()
-=======
 		if explode_on_hit and explode_radius > 0.0:
 			_apply_explosion()
-		queue_free()
->>>>>>> dcdc05faf45bd9c9ea451c8b73905604e8bfbf17
+		_release()
 
 
 func _process_orbit(delta: float) -> void:
 	if orbit_owner == null or not is_instance_valid(orbit_owner):
-		queue_free()
+		_release()
 		return
 	orbit_angle += orbit_angular_speed * delta
 	global_position = orbit_owner.global_position + Vector2.RIGHT.rotated(orbit_angle) * orbit_radius
@@ -93,10 +86,7 @@ func _on_body_entered(body: Node) -> void:
 	if body.has_method("can_be_hit_by_projectile") and not body.can_be_hit_by_projectile():
 		return
 
-<<<<<<< HEAD
 	var body_id: int = body.get_instance_id()
-=======
-	var body_id := body.get_instance_id()
 
 	if orbit_active:
 		# Orbit drones tick-damage on contact instead of single-pierce.
@@ -107,7 +97,6 @@ func _on_body_entered(body: Node) -> void:
 			_orbit_damage_cooldowns[body_id] = orbit_damage_interval
 		return
 
->>>>>>> dcdc05faf45bd9c9ea451c8b73905604e8bfbf17
 	if _hit_targets.has(body_id):
 		return
 	_hit_targets[body_id] = true
@@ -116,21 +105,9 @@ func _on_body_entered(body: Node) -> void:
 		body.take_damage(damage, global_position, "projectile")
 		_remaining_pierce -= 1
 		if _remaining_pierce <= 0:
-<<<<<<< HEAD
-			_release()
-
-
-func _release() -> void:
-	if has_meta("pool"):
-		var pool: Variant = get_meta("pool")
-		if pool != null and pool.has_method("release"):
-			pool.release(self)
-			return
-	queue_free()
-=======
 			if explode_on_hit and explode_radius > 0.0:
 				_apply_explosion()
-			queue_free()
+			_release()
 
 
 func _flip_toward_player() -> void:
@@ -163,4 +140,12 @@ func _apply_explosion() -> void:
 			continue
 		if enemy.has_method("take_damage"):
 			enemy.take_damage(explode_damage, global_position, "explosion")
->>>>>>> dcdc05faf45bd9c9ea451c8b73905604e8bfbf17
+
+
+func _release() -> void:
+	if has_meta("pool"):
+		var pool: Variant = get_meta("pool")
+		if pool != null and pool.has_method("release"):
+			pool.release(self)
+			return
+	queue_free()

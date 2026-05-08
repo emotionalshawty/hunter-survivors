@@ -97,7 +97,9 @@ func _ready() -> void:
 	)
 	_reset_run_state()
 	randomize()
-	player.shoot_requested.connect(_on_player_shoot_requested)
+	# player.shoot_requested is intentionally not connected — firing is now
+	# driven by WeaponSystem.tick_active_weapons so each equipped weapon has
+	# its own cooldown and can fire concurrently.
 	damage_upgrade_button.pressed.connect(_on_damage_upgrade_pressed)
 	health_upgrade_button.pressed.connect(_on_health_upgrade_pressed)
 	speed_upgrade_button.pressed.connect(_on_speed_upgrade_pressed)
@@ -167,6 +169,7 @@ func _physics_process(delta: float) -> void:
 		_spatial_hash.rebuild_from_node(enemies)
 
 	if _weapon_system != null:
+		_weapon_system.tick_active_weapons(delta, player, PROJECTILE_SCENE, projectiles, enemies)
 		_weapon_system.apply_aura_damage(delta, _spatial_hash, player)
 		_weapon_system.process_chain_lightning_beam(delta, _spatial_hash, player.global_position)
 		_weapon_system.update_orbit_damage(delta)
@@ -453,7 +456,7 @@ func _save_progress(extra_data: Dictionary = {}) -> void:
 		return
 	var projectile_multiplier: float = 1.0
 	if _weapon_system != null:
-		projectile_multiplier = _weapon_system.get_damage_multiplier()
+		projectile_multiplier = _weapon_system.projectile_damage_multiplier
 	var payload := ProgressionSystem.make_save_payload(level, experience, experience_to_level, player_health, player_max_health, projectile_multiplier, player.speed, best_score, total_xp_collected, lifetime_deaths, extra_data)
 	database.save_player_data(player_id, total_coins, highest_level, payload)
 
@@ -524,7 +527,11 @@ func _apply_weapon_offer(offer: Dictionary) -> void:
 	var kind: String = str(offer.get("kind", ""))
 	if kind == "active":
 		var mode: int = int(offer.get("mode", WeaponSystem.MODE_NORMAL))
-		_weapon_system.choose_weapon_mode(mode, player)
+		var displaced: WeaponItem = _weapon_system.choose_weapon_mode(mode, player)
+		# If the new weapon kicked an old one out of the 3-slot cap, drop the
+		# displaced mode from the owned list so the level-up screen can offer it again.
+		if displaced != null:
+			_owned_weapon_modes.erase(displaced.weapon_mode)
 		if not (mode in _owned_weapon_modes):
 			_owned_weapon_modes.append(mode)
 	elif kind == "passive":
@@ -566,12 +573,3 @@ func _sync_chain_lightning_visual() -> void:
 		chain_lightning_visual.call("set_active", false)
 		return
 	chain_lightning_visual.call("set_chain_points", _weapon_system.get_chain_beam_points(), true)
-
-
-func _on_player_shoot_requested(origin: Vector2, direction: Vector2) -> void:
-	if _weapon_system == null:
-		return
-	_weapon_system.spawn_projectiles(PROJECTILE_SCENE, projectiles, enemies, origin, direction)
-	if effects != null:
-		effects.spawn_muzzle_flash(origin, direction)
-	_shake(0.08)

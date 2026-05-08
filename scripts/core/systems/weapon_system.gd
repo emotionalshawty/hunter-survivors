@@ -16,18 +16,23 @@ const MODE_BOOMERANG: int = WeaponDataScript.MODE_BOOMERANG
 
 const DAMAGE_UPGRADE_STEP: float = 0.25
 
+# How many active weapons can fire concurrently.
+const MAX_EQUIPPED_WEAPONS: int = 3
+
 # Per-run multiplier from "Damage +25%" stat upgrades.
 var projectile_damage_multiplier: float = 1.0
 
-# Currently equipped weapon — drives main fire mode + stat modifiers.
-var equipped_weapon: WeaponItem = null
+# Active weapon stack — each entry has its own cooldown so weapons fire
+# independently. Duplicate modes are not allowed.
+var equipped_weapons: Array[WeaponItem] = []
+var _weapon_cooldowns: Array[float] = []
 
-# Passive states.
+# Passives — separate from active weapon slots, never count against the cap.
 var aura_active: bool = false
 var orbit_active: bool = false
 var _orbit_drones: Array[Area2D] = []
 
-# Chain lightning runtime state.
+# Chain lightning runtime state (driven from process_chain_lightning_beam).
 var _chain_beam_has_target: bool = false
 var _chain_beam_endpoint: Vector2 = Vector2.ZERO
 var _chain_beam_points: Array[Vector2] = []
@@ -37,16 +42,18 @@ var _chain_beam_points: Array[Vector2] = []
 # Lifecycle
 # ---------------------------------------------------------------------------
 
-func reset(player: CharacterBody2D) -> void:
+func reset(_player: CharacterBody2D) -> void:
 	projectile_damage_multiplier = 1.0
-	equipped_weapon = WeaponItemScript.create_starter(MODE_NORMAL)
+	equipped_weapons.clear()
+	_weapon_cooldowns.clear()
 	aura_active = false
 	orbit_active = false
 	_clear_orbit_drones()
 	_chain_beam_has_target = false
 	_chain_beam_endpoint = Vector2.ZERO
 	_chain_beam_points.clear()
-	_apply_fire_interval(player)
+	# Every run starts with the auto-pistol equipped so the player can hit something immediately.
+	_add_weapon_to_slot(WeaponItemScript.create_starter(MODE_NORMAL))
 
 
 func _clear_orbit_drones() -> void:
@@ -57,29 +64,58 @@ func _clear_orbit_drones() -> void:
 
 
 # ---------------------------------------------------------------------------
-# Equipping
+# Equipping (stacking)
 # ---------------------------------------------------------------------------
 
-func equip_weapon(item: WeaponItem, player: CharacterBody2D) -> void:
+# Equips an item into the active stack.
+# - If the same mode is already equipped: returns null (no-op).
+# - If a slot is free: appends and returns null.
+# - Otherwise: replaces the oldest slot and returns the displaced WeaponItem.
+func equip_weapon(item: WeaponItem) -> WeaponItem:
 	if item == null:
-		return
-	equipped_weapon = item
-	_apply_fire_interval(player)
+		return null
+	if has_weapon_mode(item.weapon_mode):
+		return null
+	return _add_weapon_to_slot(item)
 
 
-func _apply_fire_interval(player: CharacterBody2D) -> void:
-	if player == null or equipped_weapon == null:
-		return
-	var stats: Dictionary = WeaponDataScript.get_mode_stats(equipped_weapon.weapon_mode)
-	var base_interval: float = float(stats.get("fire_interval", 0.4))
-	# Chain lightning is a continuous beam — fire_interval just gates respawn rate of the visual.
-	player.fire_interval = equipped_weapon.get_modified_fire_interval(base_interval)
+func _add_weapon_to_slot(item: WeaponItem) -> WeaponItem:
+	var displaced: WeaponItem = null
+	if equipped_weapons.size() >= MAX_EQUIPPED_WEAPONS:
+		displaced = equipped_weapons[0]
+		equipped_weapons.pop_front()
+		_weapon_cooldowns.pop_front()
+	equipped_weapons.append(item)
+	# Slight stagger so concurrent weapons don't all fire on the same frame.
+	var stagger: float = 0.05 * float(_weapon_cooldowns.size())
+	_weapon_cooldowns.append(stagger)
+	return displaced
 
 
+func has_weapon_mode(mode: int) -> bool:
+	for w in equipped_weapons:
+		if w != null and w.weapon_mode == mode:
+			return true
+	return false
+
+
+func get_equipped_modes() -> Array[int]:
+	var out: Array[int] = []
+	for w in equipped_weapons:
+		if w != null:
+			out.append(w.weapon_mode)
+	return out
+
+
+func is_active_full() -> bool:
+	return equipped_weapons.size() >= MAX_EQUIPPED_WEAPONS
+
+
+# Backwards-compatible primary-weapon getter — returns the first equipped slot, or 0 (NORMAL).
 func get_weapon_mode() -> int:
-	if equipped_weapon == null:
+	if equipped_weapons.is_empty():
 		return MODE_NORMAL
-	return equipped_weapon.weapon_mode
+	return equipped_weapons[0].weapon_mode
 
 
 # ---------------------------------------------------------------------------
@@ -91,37 +127,36 @@ func apply_damage_upgrade() -> void:
 
 
 # ---------------------------------------------------------------------------
-# Weapon selection helpers — used by level-up handlers.
-# Each builds a fresh starter WeaponItem and equips it.
+# Mode selection helpers — used by level-up handlers in game.gd.
+# Returns the displaced weapon (or null) so callers can sync UI / owned-modes lists.
 # ---------------------------------------------------------------------------
 
-func choose_weapon_mode(mode: int, player: CharacterBody2D) -> void:
-	var item: WeaponItem = WeaponItemScript.create_starter(mode)
-	equip_weapon(item, player)
+func choose_weapon_mode(mode: int, _player: CharacterBody2D) -> WeaponItem:
+	return equip_weapon(WeaponItemScript.create_starter(mode))
 
 
-func choose_sniper(player: CharacterBody2D) -> void:
-	choose_weapon_mode(MODE_SNIPER, player)
+func choose_sniper(player: CharacterBody2D) -> WeaponItem:
+	return choose_weapon_mode(MODE_SNIPER, player)
 
 
-func choose_shotgun(player: CharacterBody2D) -> void:
-	choose_weapon_mode(MODE_SHOTGUN, player)
+func choose_shotgun(player: CharacterBody2D) -> WeaponItem:
+	return choose_weapon_mode(MODE_SHOTGUN, player)
 
 
-func choose_chain_lightning(player: CharacterBody2D) -> void:
-	choose_weapon_mode(MODE_CHAIN_LIGHTNING, player)
+func choose_chain_lightning(player: CharacterBody2D) -> WeaponItem:
+	return choose_weapon_mode(MODE_CHAIN_LIGHTNING, player)
 
 
-func choose_burst(player: CharacterBody2D) -> void:
-	choose_weapon_mode(MODE_BURST, player)
+func choose_burst(player: CharacterBody2D) -> WeaponItem:
+	return choose_weapon_mode(MODE_BURST, player)
 
 
-func choose_rocket(player: CharacterBody2D) -> void:
-	choose_weapon_mode(MODE_ROCKET, player)
+func choose_rocket(player: CharacterBody2D) -> WeaponItem:
+	return choose_weapon_mode(MODE_ROCKET, player)
 
 
-func choose_boomerang(player: CharacterBody2D) -> void:
-	choose_weapon_mode(MODE_BOOMERANG, player)
+func choose_boomerang(player: CharacterBody2D) -> WeaponItem:
+	return choose_weapon_mode(MODE_BOOMERANG, player)
 
 
 # ---------------------------------------------------------------------------
@@ -136,20 +171,15 @@ func choose_orbit(projectile_scene: PackedScene, projectiles_parent: Node2D, pla
 	if projectile_scene == null or projectiles_parent == null or player == null:
 		return
 	if orbit_active:
-		# Already active — refresh drones in case parent was cleared.
 		_clear_orbit_drones()
 	orbit_active = true
 	var stats: Dictionary = WeaponDataScript.get_passive_stats(WeaponDataScript.PASSIVE_ORBIT)
 	var drone_count: int = int(stats.get("drone_count", 3))
-	var base_radius: float = float(stats.get("radius", 78.0))
+	var radius: float = float(stats.get("radius", 78.0))
 	var angular_speed: float = float(stats.get("angular_speed", 2.4))
 	var damage: float = float(stats.get("damage_per_tick", 0.7))
 	var tick_interval: float = float(stats.get("tick_interval", 0.18))
 	var drone_scale: float = float(stats.get("scale", 0.7))
-	var radius_mult: float = 1.0
-	if equipped_weapon != null:
-		radius_mult = equipped_weapon.area_radius_mult
-	var radius: float = base_radius * radius_mult
 
 	for i in drone_count:
 		var drone: Area2D = projectile_scene.instantiate()
@@ -169,7 +199,6 @@ func choose_orbit(projectile_scene: PackedScene, projectiles_parent: Node2D, pla
 
 
 func update_orbit_damage(_delta: float) -> void:
-	# Refresh drone damage each frame so projectile_damage_multiplier upgrades take effect live.
 	if not orbit_active:
 		return
 	var stats: Dictionary = WeaponDataScript.get_passive_stats(WeaponDataScript.PASSIVE_ORBIT)
@@ -192,10 +221,7 @@ func is_orbit_active() -> bool:
 
 
 func get_aura_radius() -> float:
-	var base_radius: float = float(WeaponDataScript.get_passive_stats(WeaponDataScript.PASSIVE_AURA).get("radius", 105.0))
-	if equipped_weapon == null:
-		return base_radius
-	return base_radius * equipped_weapon.area_radius_mult
+	return float(WeaponDataScript.get_passive_stats(WeaponDataScript.PASSIVE_AURA).get("radius", 105.0))
 
 
 func has_chain_beam_target() -> bool:
@@ -215,85 +241,123 @@ func get_chain_beam_points() -> Array[Vector2]:
 
 
 # ---------------------------------------------------------------------------
-# Firing
+# Firing — driven from game._physics_process; no longer from player.shoot_requested.
+# Each equipped weapon has its own cooldown so they fire concurrently.
 # ---------------------------------------------------------------------------
 
-func spawn_projectiles(projectile_scene: PackedScene, projectiles: Node2D, _enemies: Node2D, origin: Vector2, direction: Vector2) -> void:
-	if equipped_weapon == null:
+func tick_active_weapons(delta: float, player: CharacterBody2D, projectile_scene: PackedScene, projectiles_root: Node2D, enemies_root: Node2D) -> void:
+	if player == null or projectile_scene == null or projectiles_root == null:
 		return
-	var mode: int = equipped_weapon.weapon_mode
-	var stats: Dictionary = WeaponDataScript.get_mode_stats(mode)
+	if equipped_weapons.is_empty():
+		return
 
-	match mode:
-		MODE_SNIPER:
-			_spawn_single(projectile_scene, projectiles, stats, origin, direction)
+	# Compute targeting direction once per frame; all weapons aim at the same target.
+	var direction: Vector2 = _find_attack_direction(player, enemies_root)
+
+	for i in equipped_weapons.size():
+		_weapon_cooldowns[i] -= delta
+		if _weapon_cooldowns[i] > 0.0:
+			continue
+		var weapon: WeaponItem = equipped_weapons[i]
+		if weapon == null:
+			continue
+		# Chain lightning is a continuous beam handled by process_chain_lightning_beam.
+		if weapon.weapon_mode == MODE_CHAIN_LIGHTNING:
+			_weapon_cooldowns[i] = 0.0
+			continue
+		if direction == Vector2.ZERO:
+			# No targets in range — recheck soon without burning the full reload.
+			_weapon_cooldowns[i] = 0.05
+			continue
+		_fire_weapon(weapon, projectile_scene, projectiles_root, player.global_position, direction)
+		var stats: Dictionary = WeaponDataScript.get_mode_stats(weapon.weapon_mode)
+		var base_interval: float = float(stats.get("fire_interval", 0.4))
+		_weapon_cooldowns[i] = weapon.get_modified_fire_interval(base_interval)
+
+
+func _find_attack_direction(player: CharacterBody2D, enemies_root: Node2D) -> Vector2:
+	if enemies_root == null:
+		return Vector2.ZERO
+	var nearest: Node2D = null
+	var best_sq: float = INF
+	for e in enemies_root.get_children():
+		if not (e is Node2D):
+			continue
+		var d: float = (e as Node2D).global_position.distance_squared_to(player.global_position)
+		if d < best_sq:
+			best_sq = d
+			nearest = e
+	if nearest == null:
+		return Vector2.ZERO
+	return (nearest.global_position - player.global_position).normalized()
+
+
+func _fire_weapon(weapon: WeaponItem, projectile_scene: PackedScene, projectiles: Node2D, origin: Vector2, direction: Vector2) -> void:
+	var stats: Dictionary = WeaponDataScript.get_mode_stats(weapon.weapon_mode)
+	match weapon.weapon_mode:
 		MODE_SHOTGUN:
-			_spawn_shotgun(projectile_scene, projectiles, stats, origin, direction)
+			_spawn_shotgun(projectile_scene, projectiles, weapon, stats, origin, direction)
 		MODE_BURST:
-			_spawn_burst(projectile_scene, projectiles, stats, origin, direction)
+			_spawn_burst(projectile_scene, projectiles, weapon, stats, origin, direction)
 		MODE_ROCKET:
-			_spawn_rocket(projectile_scene, projectiles, stats, origin, direction)
+			_spawn_rocket(projectile_scene, projectiles, weapon, stats, origin, direction)
 		MODE_BOOMERANG:
-			_spawn_boomerang(projectile_scene, projectiles, stats, origin, direction)
+			_spawn_boomerang(projectile_scene, projectiles, weapon, stats, origin, direction)
 		MODE_CHAIN_LIGHTNING:
 			# Continuous beam — handled in process_chain_lightning_beam each frame.
 			pass
 		_:
-			_spawn_single(projectile_scene, projectiles, stats, origin, direction)
+			_spawn_single(projectile_scene, projectiles, weapon, stats, origin, direction)
 
 
-func _spawn_single(projectile_scene: PackedScene, projectiles: Node2D, stats: Dictionary, origin: Vector2, direction: Vector2) -> void:
+func _spawn_single(projectile_scene: PackedScene, projectiles: Node2D, weapon: WeaponItem, stats: Dictionary, origin: Vector2, direction: Vector2) -> void:
 	var p: Area2D = projectile_scene.instantiate()
-	_configure_projectile(p, stats, direction)
+	_configure_projectile(p, weapon, stats, direction)
 	p.global_position = origin
 	projectiles.add_child(p)
 
 
-func _spawn_shotgun(projectile_scene: PackedScene, projectiles: Node2D, stats: Dictionary, origin: Vector2, direction: Vector2) -> void:
+func _spawn_shotgun(projectile_scene: PackedScene, projectiles: Node2D, weapon: WeaponItem, stats: Dictionary, origin: Vector2, direction: Vector2) -> void:
 	var pellet_count: int = int(stats.get("pellet_count", 5))
 	var spread_step: float = float(stats.get("spread_step", 0.16))
 	for pellet_index in pellet_count:
 		var centered_index: float = float(pellet_index) - float(pellet_count - 1) * 0.5
 		var pellet: Area2D = projectile_scene.instantiate()
 		var spread_dir: Vector2 = direction.rotated(centered_index * spread_step).normalized()
-		_configure_projectile(pellet, stats, spread_dir)
+		_configure_projectile(pellet, weapon, stats, spread_dir)
 		pellet.global_position = origin
 		projectiles.add_child(pellet)
 
 
-func _spawn_burst(projectile_scene: PackedScene, projectiles: Node2D, stats: Dictionary, origin: Vector2, direction: Vector2) -> void:
+func _spawn_burst(projectile_scene: PackedScene, projectiles: Node2D, weapon: WeaponItem, stats: Dictionary, origin: Vector2, direction: Vector2) -> void:
 	var burst_count: int = int(stats.get("burst_count", 3))
 	var spread_step: float = float(stats.get("burst_spread_step", 0.05))
 	for i in burst_count:
 		var centered_index: float = float(i) - float(burst_count - 1) * 0.5
 		var bullet: Area2D = projectile_scene.instantiate()
 		var dir: Vector2 = direction.rotated(centered_index * spread_step).normalized()
-		_configure_projectile(bullet, stats, dir)
+		_configure_projectile(bullet, weapon, stats, dir)
 		bullet.global_position = origin
 		projectiles.add_child(bullet)
 
 
-func _spawn_rocket(projectile_scene: PackedScene, projectiles: Node2D, stats: Dictionary, origin: Vector2, direction: Vector2) -> void:
+func _spawn_rocket(projectile_scene: PackedScene, projectiles: Node2D, weapon: WeaponItem, stats: Dictionary, origin: Vector2, direction: Vector2) -> void:
 	var rocket: Area2D = projectile_scene.instantiate()
-	_configure_projectile(rocket, stats, direction)
+	_configure_projectile(rocket, weapon, stats, direction)
 	rocket.explode_on_hit = true
-	var radius_mult: float = 1.0
-	var damage_mult: float = projectile_damage_multiplier
-	if equipped_weapon != null:
-		radius_mult = equipped_weapon.area_radius_mult
-		damage_mult = equipped_weapon.get_total_damage_multiplier(projectile_damage_multiplier)
+	var damage_mult: float = weapon.get_total_damage_multiplier(projectile_damage_multiplier)
+	var radius_mult: float = weapon.area_radius_mult
 	rocket.explode_radius = float(stats.get("explode_radius", 80.0)) * radius_mult
 	rocket.explode_damage = float(stats.get("explode_damage", 3.0)) * damage_mult
 	rocket.global_position = origin
 	projectiles.add_child(rocket)
 
 
-func _spawn_boomerang(projectile_scene: PackedScene, projectiles: Node2D, stats: Dictionary, origin: Vector2, direction: Vector2) -> void:
+func _spawn_boomerang(projectile_scene: PackedScene, projectiles: Node2D, weapon: WeaponItem, stats: Dictionary, origin: Vector2, direction: Vector2) -> void:
 	var boom: Area2D = projectile_scene.instantiate()
-	_configure_projectile(boom, stats, direction)
+	_configure_projectile(boom, weapon, stats, direction)
 	boom.boomerang_returns = true
 	var return_after: float = float(stats.get("return_after", 0.55))
-	# Total lifetime allows for outbound + return.
 	var base_lifetime: float = float(stats.get("lifetime", 1.6))
 	boom.lifetime = base_lifetime
 	boom.boomerang_return_time = return_after
@@ -301,20 +365,16 @@ func _spawn_boomerang(projectile_scene: PackedScene, projectiles: Node2D, stats:
 	projectiles.add_child(boom)
 
 
-func _configure_projectile(p: Area2D, stats: Dictionary, direction: Vector2) -> void:
+func _configure_projectile(p: Area2D, weapon: WeaponItem, stats: Dictionary, direction: Vector2) -> void:
 	var base_damage: float = float(stats.get("damage", 1.0))
 	var base_speed: float = float(stats.get("speed", 560.0))
 	var base_lifetime: float = float(stats.get("lifetime", 2.0))
 	var base_pierce: int = int(stats.get("pierce", 1))
 	var base_scale: float = float(stats.get("scale", 1.0))
 
-	var damage_mult: float = projectile_damage_multiplier
-	var speed: float = base_speed
-	var pierce: int = base_pierce
-	if equipped_weapon != null:
-		damage_mult = equipped_weapon.get_total_damage_multiplier(projectile_damage_multiplier)
-		speed = equipped_weapon.get_modified_projectile_speed(base_speed)
-		pierce = equipped_weapon.get_modified_pierce(base_pierce)
+	var damage_mult: float = weapon.get_total_damage_multiplier(projectile_damage_multiplier)
+	var speed: float = weapon.get_modified_projectile_speed(base_speed)
+	var pierce: int = weapon.get_modified_pierce(base_pierce)
 
 	p.direction = direction
 	p.damage = base_damage * damage_mult
@@ -335,14 +395,8 @@ func apply_aura_damage(delta: float, spatial_hash: SpatialHash, player: Characte
 		return
 	var stats: Dictionary = WeaponDataScript.get_passive_stats(WeaponDataScript.PASSIVE_AURA)
 	var base_dps: float = float(stats.get("dps", 5.0))
-	var base_radius: float = float(stats.get("radius", 105.0))
-	var damage_mult: float = projectile_damage_multiplier
-	var radius_mult: float = 1.0
-	if equipped_weapon != null:
-		damage_mult = equipped_weapon.get_total_damage_multiplier(projectile_damage_multiplier)
-		radius_mult = equipped_weapon.area_radius_mult
-	var aura_damage: float = base_dps * damage_mult * delta
-	var radius: float = base_radius * radius_mult
+	var radius: float = float(stats.get("radius", 105.0))
+	var aura_damage: float = base_dps * projectile_damage_multiplier * delta
 	var nearby := spatial_hash.query_circle(player.global_position, radius)
 	for enemy in nearby:
 		if not (enemy is CharacterBody2D):
@@ -351,7 +405,7 @@ func apply_aura_damage(delta: float, spatial_hash: SpatialHash, player: Characte
 
 
 # ---------------------------------------------------------------------------
-# Chain lightning
+# Chain lightning — runs only if a chain weapon is currently equipped.
 # ---------------------------------------------------------------------------
 
 func process_chain_lightning_beam(delta: float, spatial_hash: SpatialHash, origin: Vector2) -> void:
@@ -359,7 +413,9 @@ func process_chain_lightning_beam(delta: float, spatial_hash: SpatialHash, origi
 	_chain_beam_endpoint = origin
 	_chain_beam_points.clear()
 	_chain_beam_points.append(origin)
-	if get_weapon_mode() != MODE_CHAIN_LIGHTNING:
+
+	var chain_weapon: WeaponItem = _get_weapon_in_mode(MODE_CHAIN_LIGHTNING)
+	if chain_weapon == null:
 		return
 	if spatial_hash == null:
 		return
@@ -372,9 +428,7 @@ func process_chain_lightning_beam(delta: float, spatial_hash: SpatialHash, origi
 	var max_targets: int = int(stats.get("max_targets", 5))
 	var falloff: float = float(stats.get("damage_falloff", 0.55))
 
-	var damage_mult: float = projectile_damage_multiplier
-	if equipped_weapon != null:
-		damage_mult = equipped_weapon.get_total_damage_multiplier(projectile_damage_multiplier)
+	var damage_mult: float = chain_weapon.get_total_damage_multiplier(projectile_damage_multiplier)
 
 	var used_targets: Dictionary = {}
 	var primary_target := _find_nearest_chain_target(spatial_hash, origin, used_targets, first_range)
@@ -403,21 +457,25 @@ func process_chain_lightning_beam(delta: float, spatial_hash: SpatialHash, origi
 	_chain_beam_endpoint = current_point
 
 
+func _get_weapon_in_mode(mode: int) -> WeaponItem:
+	for w in equipped_weapons:
+		if w != null and w.weapon_mode == mode:
+			return w
+	return null
+
+
 func _find_nearest_chain_target(spatial_hash: SpatialHash, from_point: Vector2, used_targets: Dictionary, max_range: float) -> CharacterBody2D:
-	var best_target: CharacterBody2D = null
-	var best_distance_sq: float = max_range * max_range
-	var candidates := spatial_hash.query_circle(from_point, max_range)
-
-	for enemy in candidates:
-		if not (enemy is CharacterBody2D):
+	var best: CharacterBody2D = null
+	var best_sq: float = max_range * max_range
+	var candidates: Array = spatial_hash.query_circle(from_point, max_range)
+	for e in candidates:
+		if not (e is CharacterBody2D):
 			continue
-		var target_id: int = enemy.get_instance_id()
-		if used_targets.has(target_id):
+		var id: int = e.get_instance_id()
+		if used_targets.has(id):
 			continue
-
-		var distance_sq: float = from_point.distance_squared_to(enemy.global_position)
-		if distance_sq < best_distance_sq:
-			best_distance_sq = distance_sq
-			best_target = enemy
-
-	return best_target
+		var d: float = from_point.distance_squared_to((e as CharacterBody2D).global_position)
+		if d < best_sq:
+			best_sq = d
+			best = e
+	return best

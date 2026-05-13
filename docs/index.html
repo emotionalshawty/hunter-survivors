@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hunter Survivors — Survive the Wave</title>
+  <meta name="description" content="Hunter Survivors is a fast-paced 2D bullet-hell survivor game with online leaderboards. Auto-combat, XP leveling, and escalating hordes. Free to play." />
+  <meta property="og:title" content="Hunter Survivors" />
+  <meta property="og:description" content="Survive endless waves. Level up. Top the leaderboard." />
+  <meta property="og:type" content="website" />
+
+  <!-- Firebase JS SDK v10 (compat CDN — no bundler needed) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+  <style>
+    /* ============================================================
+       RESET & VARIABLES
+    ============================================================ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:         #0a0c10;
+      --bg2:        #10131a;
+      --bg3:        #161b26;
+      --border:     rgba(255,255,255,0.07);
+      --accent:     #00e5a0;
+      --accent2:    #00b8ff;
+      --accent3:    #ff4d6d;
+      --text:       #e8eaf0;
+      --muted:      #6b7280;
+      --card-bg:    rgba(255,255,255,0.04);
+      --glow:       0 0 28px rgba(0,229,160,0.18);
+      --glow2:      0 0 28px rgba(0,184,255,0.18);
+      --radius:     12px;
+      --max:        1120px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    a { color: inherit; text-decoration: none; }
+
+    /* ============================================================
+       NOISE OVERLAY
+    ============================================================ */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.6;
+    }
+
+    /* ============================================================
+       NAV
+    ============================================================ */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0;
+      z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 clamp(16px, 4vw, 48px);
+      height: 60px;
+      background: rgba(10,12,16,0.82);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-logo {
+      font-size: 15px; font-weight: 700; letter-spacing: 0.05em;
+      color: var(--accent);
+      text-transform: uppercase;
+    }
+
+    .nav-links { display: flex; gap: 28px; }
+    .nav-links a {
+      font-size: 13px; color: var(--muted);
+      transition: color 0.2s;
+    }
+    .nav-links a:hover { color: var(--text); }
+
+    .nav-cta {
+      font-size: 13px; font-weight: 600;
+      background: var(--accent); color: #0a0c10;
+      padding: 8px 18px; border-radius: 6px;
+      transition: opacity 0.2s, transform 0.15s;
+    }
+    .nav-cta:hover { opacity: 0.88; transform: translateY(-1px); }
+
+    /* ============================================================
+       HERO
+    ============================================================ */
+    #hero {
+      position: relative;
+      min-height: 100vh;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      text-align: center;
+      padding: 100px clamp(16px, 5vw, 64px) 80px;
+      overflow: hidden;
+    }
+
+    /* Grid bg */
+    #hero::after {
+      content: '';
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(rgba(0,229,160,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,229,160,0.04) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: radial-gradient(ellipse 80% 60% at 50% 40%, black 40%, transparent 100%);
+      pointer-events: none;
+    }
+
+    /* Glow orbs */
+    .hero-orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      pointer-events: none;
+      animation: pulse 6s ease-in-out infinite;
+    }
+    .hero-orb-1 {
+      width: 420px; height: 420px;
+      background: rgba(0,229,160,0.10);
+      top: -80px; left: -60px;
+      animation-delay: 0s;
+    }
+    .hero-orb-2 {
+      width: 360px; height: 360px;
+      background: rgba(0,184,255,0.08);
+      bottom: 0; right: -40px;
+      animation-delay: 3s;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.7; transform: scale(1.08); }
+    }
+
+    .hero-eyebrow {
+      display: inline-block;
+      font-size: 11px; font-weight: 700; letter-spacing: 0.18em;
+      text-transform: uppercase; color: var(--accent);
+      background: rgba(0,229,160,0.10);
+      border: 1px solid rgba(0,229,160,0.25);
+      border-radius: 20px; padding: 5px 14px;
+      margin-bottom: 24px;
+    }
+
+    .hero-title {
+      font-size: clamp(42px, 8vw, 88px);
+      font-weight: 900;
+      line-height: 1.0;
+      letter-spacing: -0.03em;
+      margin-bottom: 20px;
+      position: relative;
+    }
+
+    .hero-title .line1 { display: block; color: var(--text); }
+    .hero-title .line2 {
+      display: block;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero-sub {
+      max-width: 520px;
+      font-size: clamp(15px, 2vw, 18px);
+      color: var(--muted);
+      margin-bottom: 40px;
+      line-height: 1.7;
+    }
+
+    .hero-buttons {
+      display: flex; gap: 14px; flex-wrap: wrap;
+      justify-content: center;
+      margin-bottom: 56px;
+    }
+
+    .btn-primary {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 14px 32px;
+      background: var(--accent); color: #0a0c10;
+      font-weight: 700; font-size: 15px; border-radius: 8px;
+      transition: box-shadow 0.2s, transform 0.15s;
+      box-shadow: 0 0 0 0 rgba(0,229,160,0.4);
+    }
+    .btn-primary:hover {
+      box-shadow: 0 0 32px rgba(0,229,160,0.4);
+      transform: translateY(-2px);
+    }
+
+    .btn-secondary {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 14px 28px;
+      background: transparent; color: var(--text);
+      font-weight: 600; font-size: 15px; border-radius: 8px;
+      border: 1px solid var(--border);
+      transition: border-color 0.2s, transform 0.15s, background 0.2s;
+    }
+    .btn-secondary:hover {
+      border-color: rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.04);
+      transform: translateY(-2px);
+    }
+
+    /* ============================================================
+       LIVE STATS TICKER
+    ============================================================ */
+    #stats-bar {
+      position: relative;
+      background: var(--bg2);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      padding: 20px clamp(16px, 5vw, 64px);
+    }
+
+    .stats-grid {
+      max-width: var(--max);
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 24px;
+      text-align: center;
+    }
+
+    .stat-value {
+      display: block;
+      font-size: clamp(22px, 3.5vw, 32px);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--accent);
+      line-height: 1.1;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .stat-value.blue  { color: var(--accent2); }
+    .stat-value.red   { color: var(--accent3); }
+    .stat-value.white { color: var(--text); }
+
+    .stat-label {
+      display: block;
+      font-size: 11px; font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    .shimmer {
+      background: linear-gradient(90deg, var(--bg3) 25%, rgba(255,255,255,0.06) 50%, var(--bg3) 75%);
+      background-size: 400% 100%;
+      animation: shimmer 1.4s infinite;
+      border-radius: 4px;
+      display: inline-block;
+      width: 80px; height: 32px;
+    }
+    @keyframes shimmer {
+      0%   { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    .stats-notice {
+      max-width: var(--max); margin: 12px auto 0;
+      font-size: 11px; color: var(--muted); text-align: center;
+    }
+    .stats-notice a { color: var(--accent); text-decoration: underline; }
+
+    /* ============================================================
+       SECTIONS SHARED
+    ============================================================ */
+    section {
+      padding: clamp(60px, 8vw, 100px) clamp(16px, 5vw, 64px);
+      position: relative;
+    }
+
+    .section-eyebrow {
+      display: block;
+      font-size: 11px; font-weight: 700; letter-spacing: 0.18em;
+      text-transform: uppercase; color: var(--accent);
+      margin-bottom: 12px;
+    }
+
+    .section-title {
+      font-size: clamp(28px, 4vw, 44px);
+      font-weight: 800; letter-spacing: -0.02em;
+      line-height: 1.15;
+      margin-bottom: 16px;
+    }
+
+    .section-sub {
+      font-size: 16px; color: var(--muted);
+      max-width: 520px; line-height: 1.7;
+    }
+
+    .section-header { margin-bottom: 52px; }
+    .container { max-width: var(--max); margin: 0 auto; }
+
+    /* ============================================================
+       FEATURES
+    ============================================================ */
+    #features { background: var(--bg); }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+    }
+
+    .feature-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px 24px;
+      transition: border-color 0.25s, transform 0.25s, box-shadow 0.25s;
+    }
+    .feature-card:hover {
+      border-color: rgba(0,229,160,0.3);
+      transform: translateY(-4px);
+      box-shadow: var(--glow);
+    }
+
+    .feature-icon { font-size: 28px; margin-bottom: 14px; display: block; }
+    .feature-card h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; color: var(--text); }
+    .feature-card p  { font-size: 14px; color: var(--muted); line-height: 1.65; }
+
+    /* ============================================================
+       HOW TO PLAY
+    ============================================================ */
+    #how-to-play { background: var(--bg2); }
+
+    .htp-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 40px;
+      align-items: start;
+    }
+
+    @media (max-width: 720px) { .htp-grid { grid-template-columns: 1fr; } }
+
+    .htp-step { display: flex; gap: 16px; margin-bottom: 28px; }
+    .htp-step:last-child { margin-bottom: 0; }
+
+    .htp-num {
+      flex-shrink: 0;
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      background: rgba(0,229,160,0.12);
+      border: 1px solid rgba(0,229,160,0.3);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700; color: var(--accent);
+    }
+
+    .htp-step h3 { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+    .htp-step p  { font-size: 13px; color: var(--muted); line-height: 1.6; }
+
+    .controls-box {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+    }
+
+    .controls-box h3 {
+      font-size: 13px; font-weight: 700;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 20px;
+    }
+
+    .control-row { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+    .control-row:last-child { margin-bottom: 0; }
+
+    .kbd {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 36px; height: 32px; padding: 0 8px;
+      background: var(--bg2);
+      border: 1px solid rgba(255,255,255,0.14);
+      border-bottom: 2px solid rgba(255,255,255,0.08);
+      border-radius: 5px;
+      font-size: 12px; font-weight: 600; color: var(--text);
+      font-family: monospace;
+    }
+
+    .control-desc { font-size: 13px; color: var(--muted); }
+
+    .enemy-list { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 24px; }
+
+    .enemy-tag {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 13px;
+    }
+    .enemy-tag strong { display: block; font-size: 12px; color: var(--accent); margin-bottom: 2px; }
+    .enemy-tag span   { color: var(--muted); font-size: 12px; }
+
+    /* ============================================================
+       WEAPONS
+    ============================================================ */
+    #weapons { background: var(--bg); }
+
+    .weapons-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 14px;
+    }
+
+    .weapon-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 18px;
+      transition: border-color 0.25s, transform 0.2s;
+    }
+    .weapon-card:hover {
+      border-color: rgba(0,184,255,0.35);
+      transform: translateY(-3px);
+      box-shadow: var(--glow2);
+    }
+
+    .weapon-card .w-icon { font-size: 24px; margin-bottom: 10px; display: block; }
+    .weapon-card h3 { font-size: 14px; font-weight: 700; margin-bottom: 5px; }
+    .weapon-card p  { font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+    .weapon-badge {
+      display: inline-block;
+      font-size: 9px; font-weight: 700;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      padding: 2px 7px; border-radius: 4px;
+      margin-top: 8px;
+    }
+    .badge-active  { background: rgba(0,229,160,0.12); color: var(--accent); border: 1px solid rgba(0,229,160,0.25); }
+    .badge-passive { background: rgba(0,184,255,0.10); color: var(--accent2); border: 1px solid rgba(0,184,255,0.25); }
+
+    /* ============================================================
+       LEADERBOARD
+    ============================================================ */
+    #leaderboard { background: var(--bg2); }
+
+    .lb-wrapper {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 40px;
+      align-items: start;
+    }
+
+    @media (max-width: 800px) { .lb-wrapper { grid-template-columns: 1fr; } }
+
+    .lb-table {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .lb-header {
+      display: grid; grid-template-columns: 44px 1fr auto;
+      padding: 12px 18px;
+      font-size: 11px; font-weight: 700;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .lb-row {
+      display: grid; grid-template-columns: 44px 1fr auto;
+      padding: 13px 18px;
+      border-bottom: 1px solid var(--border);
+      align-items: center;
+      transition: background 0.15s;
+    }
+    .lb-row:last-child { border-bottom: none; }
+    .lb-row:hover { background: rgba(255,255,255,0.03); }
+
+    .lb-rank { font-size: 13px; font-weight: 800; color: var(--muted); }
+    .lb-rank.gold   { color: #ffd700; }
+    .lb-rank.silver { color: #c0c0c0; }
+    .lb-rank.bronze { color: #cd7f32; }
+
+    .lb-name  { font-size: 14px; font-weight: 600; }
+    .lb-score { font-size: 14px; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
+
+    #lb-list-placeholder { padding: 24px 18px; text-align: center; color: var(--muted); font-size: 13px; }
+
+    .lb-info h3 { font-size: 20px; font-weight: 800; margin-bottom: 12px; }
+    .lb-info p  { font-size: 14px; color: var(--muted); line-height: 1.7; margin-bottom: 18px; }
+
+    .lb-refresh-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 16px;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--muted); font-size: 13px; font-weight: 600;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .lb-refresh-btn:hover { border-color: rgba(255,255,255,0.2); color: var(--text); }
+    .lb-refresh-btn.spinning .refresh-icon { animation: spin 0.7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ============================================================
+       GALLERY
+    ============================================================ */
+    #gallery { background: var(--bg); }
+
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    @media (max-width: 680px) { .gallery-grid { grid-template-columns: 1fr 1fr; } }
+
+    .gallery-item {
+      border-radius: var(--radius);
+      overflow: hidden;
+      border: 1px solid var(--border);
+      aspect-ratio: 16/10;
+      position: relative;
+      cursor: pointer;
+      transition: transform 0.25s, border-color 0.25s;
+    }
+    .gallery-item:hover { transform: scale(1.02); border-color: rgba(0,229,160,0.3); }
+    .gallery-item:first-child { grid-column: span 2; aspect-ratio: 16/7; }
+
+    .gallery-item .inner {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    .ss-arena    { background: radial-gradient(ellipse at 50% 60%, #0a1a14 0%, #040608 100%); }
+    .ss-arena::before {
+      content: ''; position: absolute; inset: 0;
+      background-image: radial-gradient(circle, rgba(0,229,160,0.06) 1px, transparent 1px);
+      background-size: 24px 24px;
+    }
+    .ss-menu     { background: linear-gradient(135deg, #080c18 0%, #0c101e 100%); }
+    .ss-gameover { background: radial-gradient(ellipse at 50% 50%, #1a0508 0%, #040508 100%); }
+    .ss-levup    { background: linear-gradient(180deg, #060e14 0%, #081018 100%); }
+
+    .gallery-label {
+      position: absolute; bottom: 10px; left: 12px;
+      font-size: 11px; font-weight: 600;
+      color: rgba(255,255,255,0.5);
+      letter-spacing: 0.06em; text-transform: uppercase;
+    }
+
+    .ss-placeholder-text {
+      font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.2);
+      letter-spacing: 0.08em; text-transform: uppercase; text-align: center;
+    }
+
+    /* ============================================================
+       DOWNLOAD CTA
+    ============================================================ */
+    #download { background: var(--bg2); text-align: center; }
+
+    .download-card {
+      max-width: 640px; margin: 0 auto;
+      background: linear-gradient(135deg, rgba(0,229,160,0.06) 0%, rgba(0,184,255,0.04) 100%);
+      border: 1px solid rgba(0,229,160,0.2);
+      border-radius: 20px;
+      padding: clamp(36px, 6vw, 64px);
+    }
+
+    .download-card .version-badge {
+      display: inline-block;
+      font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--muted);
+      border: 1px solid var(--border); border-radius: 20px;
+      padding: 4px 12px; margin-bottom: 20px;
+    }
+
+    .download-card h2  { font-size: clamp(26px, 4vw, 40px); font-weight: 800; margin-bottom: 12px; }
+    .download-card p   { font-size: 15px; color: var(--muted); margin-bottom: 32px; line-height: 1.7; }
+
+    .download-buttons { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+
+    .btn-download {
+      display: inline-flex; align-items: center; gap: 10px;
+      padding: 14px 28px;
+      background: var(--accent); color: #0a0c10;
+      font-weight: 700; font-size: 15px; border-radius: 8px;
+      transition: box-shadow 0.2s, transform 0.15s;
+    }
+    .btn-download:hover { box-shadow: 0 0 32px rgba(0,229,160,0.4); transform: translateY(-2px); }
+
+    .btn-github {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 14px 24px;
+      background: transparent; color: var(--text);
+      font-weight: 600; font-size: 14px; border-radius: 8px;
+      border: 1px solid var(--border);
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .btn-github:hover { border-color: rgba(255,255,255,0.2); background: rgba(255,255,255,0.04); }
+
+    /* ============================================================
+       FOOTER
+    ============================================================ */
+    footer {
+      background: var(--bg);
+      border-top: 1px solid var(--border);
+      padding: 32px clamp(16px, 5vw, 64px);
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 16px;
+    }
+
+    .footer-logo  { font-size: 14px; font-weight: 700; color: var(--accent); letter-spacing: 0.06em; text-transform: uppercase; }
+    .footer-text  { font-size: 12px; color: var(--muted); }
+    .footer-links { display: flex; gap: 20px; }
+    .footer-links a { font-size: 12px; color: var(--muted); transition: color 0.2s; }
+    .footer-links a:hover { color: var(--text); }
+
+    /* ============================================================
+       SCROLL ANIMATIONS
+    ============================================================ */
+    .reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.55s ease, transform 0.55s ease; }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+
+    @media (max-width: 600px) {
+      .nav-links { display: none; }
+      .hero-buttons { flex-direction: column; align-items: center; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <span class="nav-logo">Hunter Survivors</span>
+  <div class="nav-links">
+    <a href="#features">Features</a>
+    <a href="#weapons">Weapons</a>
+    <a href="#leaderboard">Leaderboard</a>
+    <a href="#download">Download</a>
+  </div>
+  <a href="#download" class="nav-cta">Play Now</a>
+</nav>
+
+<section id="hero">
+  <div class="hero-orb hero-orb-1"></div>
+  <div class="hero-orb hero-orb-2"></div>
+  <span class="hero-eyebrow">🎮 Godot 4 · Online Leaderboards · Free to Play</span>
+  <h1 class="hero-title">
+    <span class="line1">HUNTER</span>
+    <span class="line2">SURVIVORS</span>
+  </h1>
+  <p class="hero-sub">Survive endless waves of escalating hordes. Level up your pilot, unlock devastating weapons, and claim the top of the global leaderboard.</p>
+  <div class="hero-buttons">
+    <a href="#download" class="btn-primary">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download &amp; Play
+    </a>
+    <a href="#leaderboard" class="btn-secondary">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      View Leaderboard
+    </a>
+  </div>
+</section>
+
+<div id="stats-bar">
+  <div class="stats-grid">
+    <div class="stat-item">
+      <span class="stat-value" id="stat-pilots"><span class="shimmer"></span></span>
+      <span class="stat-label">Registered Pilots</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-value red" id="stat-deaths"><span class="shimmer"></span></span>
+      <span class="stat-label">Total Deaths</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-value blue" id="stat-xp"><span class="shimmer"></span></span>
+      <span class="stat-label">XP Collected</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-value white" id="stat-coins"><span class="shimmer"></span></span>
+      <span class="stat-label">Coins Earned</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-value" id="stat-games"><span class="shimmer"></span></span>
+      <span class="stat-label">Games Played</span>
+    </div>
+  </div>
+  <p class="stats-notice" id="stats-notice" style="display:none">
+    ⚠️ Global stats require a one-time setup — play a game first to initialize them.
+  </p>
+</div>
+
+<section id="features">
+  <div class="container">
+    <div class="section-header reveal">
+      <span class="section-eyebrow">Core Gameplay</span>
+      <h2 class="section-title">Everything you need to survive</h2>
+      <p class="section-sub">Auto-combat keeps you moving. Strategy keeps you alive. XP keeps you growing.</p>
+    </div>
+    <div class="features-grid">
+      <div class="feature-card reveal"><span class="feature-icon">⚡</span><h3>Auto-Combat System</h3><p>Your weapons fire automatically at the nearest threat. Focus on movement and positioning — the bullets handle themselves.</p></div>
+      <div class="feature-card reveal"><span class="feature-icon">📈</span><h3>XP &amp; Leveling</h3><p>Defeat enemies to collect XP orbs. Level up to choose between weapon upgrades, passive boosts, or raw stat improvements.</p></div>
+      <div class="feature-card reveal"><span class="feature-icon">🌊</span><h3>Escalating Hordes</h3><p>Enemy spawn rate, speed, and health all ramp over time. Six unique enemy types with distinct behaviors keep every run fresh.</p></div>
+      <div class="feature-card reveal"><span class="feature-icon">🏆</span><h3>Online Leaderboard</h3><p>Every run updates the global leaderboard. Create an account, set a new personal best, and compete with pilots worldwide.</p></div>
+      <div class="feature-card reveal"><span class="feature-icon">🎯</span><h3>Multiple Weapons</h3><p>From rapid basic shots and wide shotgun blasts to chain lightning and damage auras — build the loadout that fits your playstyle.</p></div>
+      <div class="feature-card reveal"><span class="feature-icon">💾</span><h3>Cloud Saves</h3><p>Your coins, highest level, best score, and lifetime stats are synced to Firebase every run. Progress is never lost.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="how-to-play">
+  <div class="container">
+    <div class="section-header reveal">
+      <span class="section-eyebrow">How to Play</span>
+      <h2 class="section-title">Survive as long as possible</h2>
+    </div>
+    <div class="htp-grid">
+      <div>
+        <div class="htp-step reveal"><div class="htp-num">1</div><div><h3>Create your account</h3><p>Register with email and pick a pilot name. Your stats and scores are saved to the cloud from your first run.</p></div></div>
+        <div class="htp-step reveal"><div class="htp-num">2</div><div><h3>Move to survive</h3><p>Enemies spawn and chase you constantly. Keep moving — standing still means taking contact damage from every direction.</p></div></div>
+        <div class="htp-step reveal"><div class="htp-num">3</div><div><h3>Collect XP &amp; level up</h3><p>Defeated enemies drop XP orbs. Walk over them to collect, fill the bar, and choose your next upgrade at each level threshold.</p></div></div>
+        <div class="htp-step reveal"><div class="htp-num">4</div><div><h3>Beat your high score</h3><p>Your score equals coins earned. Beating your personal best updates the global leaderboard automatically.</p></div></div>
+        <div class="reveal" style="margin-top:8px">
+          <p style="font-size:12px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:12px">Enemy Types</p>
+          <div class="enemy-list">
+            <div class="enemy-tag"><strong>Standard</strong><span>Steady chaser, balanced stats</span></div>
+            <div class="enemy-tag"><strong>Brute</strong><span>Slow but high HP &amp; damage</span></div>
+            <div class="enemy-tag"><strong>Dasher</strong><span>Rapid bursts of speed</span></div>
+            <div class="enemy-tag"><strong>Shield Bearer</strong><span>Damage-resistant front</span></div>
+            <div class="enemy-tag"><strong>Splitter</strong><span>Splits into smaller units</span></div>
+            <div class="enemy-tag"><strong>Ghost</strong><span>Phases through obstacles</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="reveal">
+        <div class="controls-box">
+          <h3>Controls</h3>
+          <div class="control-row"><span class="kbd">W</span><span class="kbd">A</span><span class="kbd">S</span><span class="kbd">D</span><span class="control-desc">Move your pilot</span></div>
+          <div class="control-row"><span class="kbd">↑</span><span class="kbd">←</span><span class="kbd">↓</span><span class="kbd">→</span><span class="control-desc">Also movement (arrow keys)</span></div>
+          <div class="control-row"><span class="kbd" style="min-width:80px">Auto</span><span class="control-desc">Weapons fire automatically</span></div>
+          <div class="control-row"><span class="kbd">ESC</span><span class="control-desc">Pause the game</span></div>
+          <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border)">
+            <p style="font-size:12px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:14px">Upgrades at Level Up</p>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <div style="display:flex;gap:10px;align-items:flex-start"><span style="font-size:18px">⚔️</span><div><div style="font-size:13px;font-weight:700">Damage</div><div style="font-size:12px;color:var(--muted)">+20% projectile damage multiplier</div></div></div>
+              <div style="display:flex;gap:10px;align-items:flex-start"><span style="font-size:18px">❤️</span><div><div style="font-size:13px;font-weight:700">Health</div><div style="font-size:12px;color:var(--muted)">+20 max HP, instantly healed</div></div></div>
+              <div style="display:flex;gap:10px;align-items:flex-start"><span style="font-size:18px">💨</span><div><div style="font-size:13px;font-weight:700">Move Speed</div><div style="font-size:12px;color:var(--muted)">+35 movement speed</div></div></div>
+              <div style="display:flex;gap:10px;align-items:flex-start"><span style="font-size:18px">🔫</span><div><div style="font-size:13px;font-weight:700">New Weapon</div><div style="font-size:12px;color:var(--muted)">Unlock or upgrade your arsenal</div></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="weapons">
+  <div class="container">
+    <div class="section-header reveal">
+      <span class="section-eyebrow">Arsenal</span>
+      <h2 class="section-title">Six ways to deal damage</h2>
+      <p class="section-sub">Unlock weapons through level-up choices. Stack passives for devastating combos.</p>
+    </div>
+    <div class="weapons-grid">
+      <div class="weapon-card reveal"><span class="w-icon">🔵</span><h3>Basic Shot</h3><p>Rapid single projectiles at the nearest enemy. Your starting weapon — reliable, fast, and upgradeable.</p><span class="weapon-badge badge-active">Active</span></div>
+      <div class="weapon-card reveal"><span class="w-icon">🔺</span><h3>Shotgun</h3><p>Wide spread of pellets, devastating at close range. Clears dense clusters in a single blast.</p><span class="weapon-badge badge-active">Active</span></div>
+      <div class="weapon-card reveal"><span class="w-icon">🎯</span><h3>Sniper</h3><p>High-damage piercing beam that punches through multiple enemies in a line.</p><span class="weapon-badge badge-active">Active</span></div>
+      <div class="weapon-card reveal"><span class="w-icon">⚡</span><h3>Chain Lightning</h3><p>Arcs between nearby enemies automatically. Exceptional vs. tight packs and shield bearers.</p><span class="weapon-badge badge-active">Active</span></div>
+      <div class="weapon-card reveal"><span class="w-icon">🌀</span><h3>Damage Aura</h3><p>Persistent radial damage field surrounding your pilot. No aiming, just stay close to enemies.</p><span class="weapon-badge badge-passive">Passive</span></div>
+      <div class="weapon-card reveal"><span class="w-icon">🔮</span><h3>Orbit</h3><p>Projectiles that circle you continuously, blocking and damaging any enemy that enters your space.</p><span class="weapon-badge badge-passive">Passive</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="gallery">
+  <div class="container">
+    <div class="section-header reveal">
+      <span class="section-eyebrow">Screenshots</span>
+      <h2 class="section-title">In action</h2>
+    </div>
+    <div class="gallery-grid reveal">
+      <div class="gallery-item ss-arena"><div class="inner"><span class="ss-placeholder-text">Arena · Combat Screenshot</span></div><span class="gallery-label">Arena</span></div>
+      <div class="gallery-item ss-levup"><div class="inner"><span class="ss-placeholder-text">Level Up Screen</span></div><span class="gallery-label">Level Up</span></div>
+      <div class="gallery-item ss-menu"><div class="inner"><span class="ss-placeholder-text">Main Menu</span></div><span class="gallery-label">Main Menu</span></div>
+      <div class="gallery-item ss-gameover"><div class="inner"><span class="ss-placeholder-text">Game Over &amp; Leaderboard</span></div><span class="gallery-label">Game Over</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="leaderboard">
+  <div class="container">
+    <div class="lb-wrapper">
+      <div>
+        <div class="section-header reveal">
+          <span class="section-eyebrow">Live Rankings</span>
+          <h2 class="section-title">Top Pilots</h2>
+        </div>
+        <div class="lb-table reveal">
+          <div class="lb-header"><span>#</span><span>Pilot</span><span>Score</span></div>
+          <div id="lb-list"><div id="lb-list-placeholder">Loading leaderboard…</div></div>
+        </div>
+      </div>
+      <div class="lb-info reveal">
+        <h3>Compete globally</h3>
+        <p>Every time you beat your personal best, your score is automatically submitted. The leaderboard refreshes in real time from Firebase.</p>
+        <p>Top the board by surviving longer, collecting more XP, and stacking the right weapon combos at level-up.</p>
+        <button class="lb-refresh-btn" id="lb-refresh-btn" onclick="loadLeaderboard()">
+          <svg class="refresh-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          Refresh
+        </button>
+        <div style="margin-top:28px;padding:16px;background:var(--bg3);border:1px solid var(--border);border-radius:10px">
+          <p style="font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Your best score shows here</p>
+          <p style="font-size:13px;color:var(--muted);line-height:1.6">Download the game, create an account, and your score is instantly on the board after your first run ends.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="download">
+  <div class="container">
+    <div class="download-card reveal">
+      <span class="version-badge">Available Now</span>
+      <h2>Ready to survive?</h2>
+      <p>Download Hunter Survivors for free. No installation required — open in Godot and press play, or grab the exported build below.</p>
+      <div class="download-buttons">
+        <a href="#" class="btn-download">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download for Windows
+        </a>
+        <a href="https://github.com/matrixomfg/hunter-survivors" target="_blank" rel="noopener" class="btn-github">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61-.546-1.385-1.335-1.755-1.335-1.755-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 21.795 24 17.295 24 12c0-6.63-5.37-12-12-12"/></svg>
+          Source on GitHub
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <span class="footer-logo">Hunter Survivors</span>
+  <span class="footer-text">Built with Godot 4 · Firebase · &copy; 2026</span>
+  <div class="footer-links">
+    <a href="https://github.com/matrixomfg/hunter-survivors" target="_blank">GitHub</a>
+    <a href="#leaderboard">Leaderboard</a>
+    <a href="#download">Download</a>
+  </div>
+</footer>
+
+<script>
+  const firebaseConfig = {
+    apiKey:        "AIzaSyA3flUW6457UE-yCenjkAhYwjQN57XCsTA",
+    authDomain:    "huntersurv-2f7da.firebaseapp.com",
+    projectId:     "huntersurv-2f7da",
+    storageBucket: "huntersurv-2f7da.appspot.com",
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+
+  function fmt(n) {
+    if (n === null || n === undefined) return '—';
+    if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
+    if (n >= 1_000)     return (n / 1_000).toFixed(1)     + 'K';
+    return n.toLocaleString();
+  }
+
+  function setStatEl(id, val) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.innerHTML = val !== null ? fmt(val) : '<span style="color:var(--muted);font-size:14px">—</span>';
+  }
+
+  async function loadGlobalStats() {
+    try {
+      const doc = await db.collection('global_stats').doc('summary').get();
+      if (doc.exists) {
+        const d = doc.data();
+        setStatEl('stat-pilots', d.total_players   ?? null);
+        setStatEl('stat-deaths', d.total_deaths     ?? null);
+        setStatEl('stat-xp',     d.total_xp_collected ?? null);
+        setStatEl('stat-coins',  d.total_coins_earned ?? null);
+        setStatEl('stat-games',  d.total_games_played ?? null);
+      } else {
+        const lb = await db.collection('leaderboard').get();
+        setStatEl('stat-pilots', lb.size);
+        setStatEl('stat-deaths', null);
+        setStatEl('stat-xp',     null);
+        setStatEl('stat-coins',  null);
+        setStatEl('stat-games',  null);
+        document.getElementById('stats-notice').style.display = 'block';
+      }
+    } catch (err) {
+      console.warn('Stats load failed:', err);
+      ['stat-pilots','stat-deaths','stat-xp','stat-coins','stat-games'].forEach(id => setStatEl(id, null));
+    }
+  }
+
+  async function loadLeaderboard() {
+    const btn  = document.getElementById('lb-refresh-btn');
+    const list = document.getElementById('lb-list');
+    btn.classList.add('spinning');
+    list.innerHTML = '<div id="lb-list-placeholder">Loading…</div>';
+
+    try {
+      const snap = await db.collection('leaderboard').limit(200).get();
+      let entries = [];
+      snap.forEach(doc => {
+        const d = doc.data();
+        const score = parseInt(d.best_score ?? 0);
+        if (score > 0) entries.push({ name: d.username || 'anonymous', score });
+      });
+
+      entries.sort((a, b) => b.score - a.score);
+      entries = entries.slice(0, 10);
+
+      if (entries.length === 0) {
+        list.innerHTML = '<div id="lb-list-placeholder">No entries yet — be the first!</div>';
+        btn.classList.remove('spinning');
+        return;
+      }
+
+      const rankClasses = ['gold','silver','bronze'];
+      const rankLabels  = ['🥇','🥈','🥉'];
+
+      list.innerHTML = entries.map((e, i) => `
+        <div class="lb-row">
+          <span class="lb-rank ${rankClasses[i] ?? ''}">${rankLabels[i] ?? '#' + (i+1)}</span>
+          <span class="lb-name">${escHtml(e.name)}</span>
+          <span class="lb-score">${e.score.toLocaleString()}</span>
+        </div>
+      `).join('');
+
+    } catch (err) {
+      console.warn('Leaderboard load failed:', err);
+      list.innerHTML = '<div id="lb-list-placeholder" style="color:var(--accent3)">Could not load — check Firestore rules.</div>';
+    }
+
+    btn.classList.remove('spinning');
+  }
+
+  function escHtml(str) {
+    return String(str)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); }
+    });
+  }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+
+  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+  loadGlobalStats();
+  loadLeaderboard();
+</script>
+
+</body>
+</html>

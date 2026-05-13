@@ -356,6 +356,8 @@ func _game_over() -> void:
 		"last_total_coins": total_coins,
 		"last_run_unix": int(Time.get_unix_time_from_system())
 	})
+	# Fire-and-forget: update global aggregate stats for the landing page
+	_push_global_stats(run_xp_gained, run_score)
 	if tactical_hud != null:
 		tactical_hud.show_game_over()
 	get_tree().paused = false
@@ -573,3 +575,33 @@ func _sync_chain_lightning_visual() -> void:
 		chain_lightning_visual.call("set_active", false)
 		return
 	chain_lightning_visual.call("set_chain_points", _weapon_system.get_chain_beam_points(), true)
+
+
+# ---------------------------------------------------------
+# GLOBAL STATS (landing page aggregate counters)
+# ---------------------------------------------------------
+# Atomically increments /global_stats/summary in Firestore.
+# Called fire-and-forget from _game_over() — failures are silent
+# so they never block the game-over screen.
+#
+# Firestore security rule needed (add to your rules):
+#   match /global_stats/{doc} {
+#     allow read: if true;          // public read for landing page
+#     allow write: if request.auth != null;  // authenticated write
+#   }
+func _push_global_stats(xp_gained: int, coins_earned: int) -> void:
+	if not Database.is_authenticated():
+		return
+	Database._sync_firestore_auth()
+	var collection: FirestoreCollection = Firebase.Firestore.collection("global_stats")
+	var doc := FirestoreDocument.new()
+	doc.doc_name = "summary"
+	doc.collection_name = "global_stats"
+	# doc_must_exist = false → Firestore creates the document on first write
+	doc._transforms.push_back(IncrementTransform.new("summary", false, "total_deaths",      1))
+	doc._transforms.push_back(IncrementTransform.new("summary", false, "total_xp_collected", xp_gained))
+	doc._transforms.push_back(IncrementTransform.new("summary", false, "total_coins_earned", coins_earned))
+	doc._transforms.push_back(IncrementTransform.new("summary", false, "total_games_played", 1))
+	var result = await collection.commit(doc)
+	if result == null or (result is Dictionary and result.has("error")):
+		print("[GlobalStats] Failed to push global stats: ", result)

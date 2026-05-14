@@ -34,12 +34,43 @@ func _ready() -> void:
 		new_record_label.visible = false
 
 
+# Show final run stats and immediately drive the leaderboard fetch/submit.
 func show_stats(data: Dictionary) -> void:
 	_populate(data)
 	_highlight_user_id = str(data.get("user_id", ""))
 	set_leaderboard_loading()
 	visible = true
 	retry_button.grab_focus()
+	_refresh_leaderboard(
+		str(data.get("user_id", "")),
+		str(data.get("pilot", "anonymous")),
+		int(data.get("best_display", 0)),
+		bool(data.get("is_new_best", false))
+	)
+
+
+# Submits the score if it's a new best, then fetches the top-10 leaderboard.
+# Self-contained — game.gd no longer needs to bridge the Database signals.
+func _refresh_leaderboard(user_id: String, pilot_name: String, best_score_value: int, is_new_best: bool) -> void:
+	if not Database.leaderboard_loaded.is_connected(_on_leaderboard_loaded):
+		Database.leaderboard_loaded.connect(_on_leaderboard_loaded)
+	if not Database.leaderboard_error.is_connected(_on_leaderboard_error):
+		Database.leaderboard_error.connect(_on_leaderboard_error)
+	_highlight_user_id = user_id
+	if is_new_best and best_score_value > 0:
+		var name_to_submit := pilot_name.strip_edges()
+		if name_to_submit.is_empty():
+			name_to_submit = "anonymous"
+		await Database.submit_leaderboard_entry(name_to_submit, best_score_value)
+	Database.fetch_leaderboard(10)
+
+
+func _on_leaderboard_loaded(entries: Array) -> void:
+	set_leaderboard(entries)
+
+
+func _on_leaderboard_error(message: String) -> void:
+	set_leaderboard_error(message)
 
 
 func set_leaderboard_loading() -> void:

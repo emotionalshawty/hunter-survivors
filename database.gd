@@ -425,3 +425,31 @@ func fetch_leaderboard(limit: int = 10) -> void:
 		entries = entries.slice(0, limit)
 
 	emit_signal("leaderboard_loaded", entries)
+
+
+# ---------------------------------------------------------
+# GLOBAL STATS (landing page aggregate counters)
+# ---------------------------------------------------------
+# Atomically increments /global_stats/summary in Firestore via field transforms.
+# Fire-and-forget — failures are silent so they never block the game-over screen.
+#
+# Required Firestore security rule:
+#   match /global_stats/{doc} {
+#     allow read: if true;
+#     allow write: if request.auth != null;
+#   }
+func push_global_stats(xp_gained: int, coins_earned: int) -> void:
+	if not is_authenticated():
+		return
+	_sync_firestore_auth()
+	var collection: FirestoreCollection = Firebase.Firestore.collection("global_stats")
+	var doc := FirestoreDocument.new()
+	doc.doc_name = "summary"
+	doc.collection_name = "global_stats"
+	doc._transforms.push_back(IncrementTransform.new("summary", false, "total_deaths", 1))
+	doc._transforms.push_back(IncrementTransform.new("summary", false, "total_xp_collected", xp_gained))
+	doc._transforms.push_back(IncrementTransform.new("summary", false, "total_coins_earned", coins_earned))
+	doc._transforms.push_back(IncrementTransform.new("summary", false, "total_games_played", 1))
+	var result: Variant = await collection.commit(doc)
+	if result == null or (result is Dictionary and result.has("error")):
+		push_warning("[GlobalStats] push failed: %s" % str(result))

@@ -19,6 +19,10 @@ const DAMAGE_UPGRADE_STEP: float = 0.25
 # How many active weapons can fire concurrently.
 const MAX_EQUIPPED_WEAPONS: int = 3
 
+# Visual sync — connected once in game._ready; removes the need for per-frame polling.
+signal aura_changed(radius: float, active: bool)
+signal chain_beam_changed(points: Array, active: bool)
+
 # Per-run multiplier from "Damage +25%" stat upgrades.
 var projectile_damage_multiplier: float = 1.0
 
@@ -54,6 +58,9 @@ func reset(_player: CharacterBody2D) -> void:
 	_chain_beam_points.clear()
 	# Every run starts with the auto-pistol equipped so the player can hit something immediately.
 	_add_weapon_to_slot(WeaponItemScript.create_starter(MODE_NORMAL))
+	# Initialise visuals to their off states.
+	aura_changed.emit(get_aura_radius(), false)
+	chain_beam_changed.emit([], false)
 
 
 func _clear_orbit_drones() -> void:
@@ -165,6 +172,7 @@ func choose_boomerang(player: CharacterBody2D) -> WeaponItem:
 
 func choose_aura() -> void:
 	aura_active = true
+	aura_changed.emit(get_aura_radius(), true)
 
 
 func choose_orbit(projectile_scene: PackedScene, projectiles_parent: Node2D, player: CharacterBody2D) -> void:
@@ -416,8 +424,10 @@ func process_chain_lightning_beam(delta: float, spatial_hash: SpatialHash, origi
 
 	var chain_weapon: WeaponItem = _get_weapon_in_mode(MODE_CHAIN_LIGHTNING)
 	if chain_weapon == null:
+		chain_beam_changed.emit([], false)
 		return
 	if spatial_hash == null:
+		chain_beam_changed.emit([], false)
 		return
 
 	var stats: Dictionary = WeaponDataScript.get_mode_stats(MODE_CHAIN_LIGHTNING)
@@ -455,6 +465,7 @@ func process_chain_lightning_beam(delta: float, spatial_hash: SpatialHash, origi
 		chain_damage *= falloff
 
 	_chain_beam_endpoint = current_point
+	chain_beam_changed.emit(_chain_beam_points, _chain_beam_points.size() >= 2)
 
 
 func _get_weapon_in_mode(mode: int) -> WeaponItem:

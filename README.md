@@ -22,12 +22,27 @@ A 2D top-down survivor game built with Godot 4 for my end-of-year CFGs project. 
 
 ## How to run
 
+### From source (Godot)
+
 1. Clone the repo
 2. Open it in **Godot 4.6+**
 3. Hit **F5** or click Play
 4. Make an account on the login screen and you're good to go
 
 > Firebase is already configured and pointing to the live project, so you don't need to set anything up.
+
+### Linux build
+
+Download the exported build, then mark it as executable and run it:
+
+```bash
+chmod +x HunterSurvivors.x86_64
+./HunterSurvivors.x86_64
+```
+
+### Windows build
+
+Just double-click the `.exe`. If there's a `.pck` file next to it, keep both in the same folder.
 
 ---
 

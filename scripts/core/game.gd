@@ -8,6 +8,7 @@ const SpatialHashScript = preload("res://scripts/core/systems/spatial_hash.gd")
 const RunStatsScript = preload("res://scripts/core/systems/run_stats.gd")
 const DifficultySystemScript = preload("res://scripts/core/systems/difficulty_system.gd")
 const EnemyScript = preload("res://scripts/entities/enemy.gd")
+const ObstacleSystemScript = preload("res://scripts/core/systems/obstacle_system.gd")
 
 const ENEMY_SCENE: PackedScene = preload("res://scenes/entities/enemy.tscn")
 const BRUTE_ENEMY_SCENE: PackedScene = preload("res://scenes/entities/enemy_brute.tscn")
@@ -27,6 +28,7 @@ const CONTACT_DAMAGE_COOLDOWN: float = 0.2
 const CONTACT_DAMAGE_RADIUS: float = 30.0
 
 @onready var player: CharacterBody2D = $Player
+@onready var obstacles: Node2D = $Obstacles
 @onready var enemies: Node2D = $Enemies
 @onready var projectiles: Node2D = $Projectiles
 @onready var pickups: Node2D = $Pickups
@@ -60,6 +62,7 @@ var _level_up_system: LevelUpSystem
 var _database_load_system: DatabaseLoadSystem
 var _spawn_system: SpawnSystem
 var _spatial_hash: SpatialHash
+var _obstacle_system: ObstacleSystem
 
 
 func _ready() -> void:
@@ -78,6 +81,9 @@ func _ready() -> void:
 		ENEMY_SCENE, BRUTE_ENEMY_SCENE, DASHER_ENEMY_SCENE,
 		SHIELD_BEARER_ENEMY_SCENE, SPLITTER_ENEMY_SCENE, GHOST_ENEMY_SCENE
 	)
+
+	_obstacle_system = ObstacleSystemScript.new()
+	_obstacle_system.spawn(obstacles, player.global_position)
 
 	_reset_run_state()
 	randomize()
@@ -314,6 +320,8 @@ func _game_over() -> void:
 		projectile.queue_free()
 	for pickup in pickups.get_children():
 		pickup.queue_free()
+	for obstacle in obstacles.get_children():
+		obstacle.queue_free()
 
 	var pilot_name: String = str(Database.current_username).strip_edges()
 	if pilot_name.is_empty():

@@ -2,10 +2,6 @@ extends RefCounted
 
 class_name WeaponData
 
-# Single source of truth for weapon balance numbers.
-# Stats are looked up at fire-time so runtime can re-tune without code changes.
-
-# --- Active weapons (main fire mode) ---
 const MODE_NORMAL: int = 0
 const MODE_SNIPER: int = 1
 const MODE_SHOTGUN: int = 2
@@ -14,13 +10,9 @@ const MODE_BURST: int = 4
 const MODE_ROCKET: int = 5
 const MODE_BOOMERANG: int = 6
 
-# --- Passive weapons (additive to main fire) ---
 const PASSIVE_AURA: String = "aura"
 const PASSIVE_ORBIT: String = "orbit"
 
-# Base stats per active mode.
-# Tuned against enemy curve: base enemy 3.0 HP, scales +12% HP every 10s,
-# spawn cap 18 + level*2 (max 70). Player base contact: ~84 DPS taken when surrounded.
 const BASE_STATS: Dictionary = {
 	MODE_NORMAL: {
 		"name": "Pistol",

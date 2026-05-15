@@ -1,14 +1,8 @@
 extends CharacterBody2D
 
-# Kept for backwards-compat with anything still listening (e.g. effects). The
-# WeaponSystem now drives firing itself via tick_active_weapons so each
-# equipped weapon has its own cooldown — this signal is no longer emitted by
-# the player.
 signal shoot_requested(origin: Vector2, direction: Vector2)
 
 @export var speed: float = 260.0
-# Legacy field — no longer used now that each equipped weapon owns its own
-# cooldown inside WeaponSystem. Kept for save-payload compatibility.
 @export var fire_interval: float = 0.65
 
 

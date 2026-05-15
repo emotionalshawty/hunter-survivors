@@ -233,9 +233,6 @@ func _get_users_collection() -> FirestoreCollection:
 	return Firebase.Firestore.collection("users")
 
 
-# ---------------------------------------------------------
-# SAVING DATA
-# ---------------------------------------------------------
 func save_player_data(player_id: String, coins: int, max_level: int, extra_data: Dictionary = {}) -> void:
 	var data_to_save := {
 		"total_coins": coins,
@@ -288,9 +285,6 @@ func _start_save_request(player_id: String, data_to_save: Dictionary) -> void:
 	_process_queued_save()
 
 
-# ---------------------------------------------------------
-# LOADING DATA
-# ---------------------------------------------------------
 func load_player_data(player_id: String) -> void:
 	if _pending_operation != RequestOperation.NONE:
 		emit_signal("firebase_error", "load", player_id, -1, "A Firebase request is already in progress.")
@@ -357,9 +351,6 @@ func _load_progress_for_user(player_id: String) -> void:
 	load_player_data(player_id)
 
 
-# ---------------------------------------------------------
-# LEADERBOARD
-# ---------------------------------------------------------
 func submit_leaderboard_entry(username: String, best_score: int) -> void:
 	if not is_authenticated():
 		emit_signal("leaderboard_error", "Not authenticated.")
@@ -427,17 +418,6 @@ func fetch_leaderboard(limit: int = 10) -> void:
 	emit_signal("leaderboard_loaded", entries)
 
 
-# ---------------------------------------------------------
-# GLOBAL STATS (landing page aggregate counters)
-# ---------------------------------------------------------
-# Atomically increments /global_stats/summary in Firestore via field transforms.
-# Fire-and-forget — failures are silent so they never block the game-over screen.
-#
-# Required Firestore security rule:
-#   match /global_stats/{doc} {
-#     allow read: if true;
-#     allow write: if request.auth != null;
-#   }
 func push_global_stats(xp_gained: int, coins_earned: int) -> void:
 	if not is_authenticated():
 		return

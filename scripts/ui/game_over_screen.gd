@@ -34,7 +34,6 @@ func _ready() -> void:
 		new_record_label.visible = false
 
 
-# Show final run stats and immediately drive the leaderboard fetch/submit.
 func show_stats(data: Dictionary) -> void:
 	_populate(data)
 	_highlight_user_id = str(data.get("user_id", ""))
@@ -49,8 +48,6 @@ func show_stats(data: Dictionary) -> void:
 	)
 
 
-# Submits the score if it's a new best, then fetches the top-10 leaderboard.
-# Self-contained — game.gd no longer needs to bridge the Database signals.
 func _refresh_leaderboard(user_id: String, pilot_name: String, best_score_value: int, is_new_best: bool) -> void:
 	if not Database.leaderboard_loaded.is_connected(_on_leaderboard_loaded):
 		Database.leaderboard_loaded.connect(_on_leaderboard_loaded)

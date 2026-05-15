@@ -214,17 +214,17 @@ autostart = true
 [node name="MarginContainer" type="MarginContainer" parent="CanvasLayer"]
 offset_left = 20.0
 offset_top = 20.0
-offset_right = 470.0
-offset_bottom = 205.0
+offset_right = 490.0
+offset_bottom = 230.0
 
 [node name="HUDPanel" type="PanelContainer" parent="CanvasLayer/MarginContainer"]
-custom_minimum_size = Vector2(450, 185)
+custom_minimum_size = Vector2(470, 210)
 layout_mode = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_hud_panel")
 
 [node name="TacticalHUD" type="Control" parent="CanvasLayer/MarginContainer/HUDPanel"]
 layout_mode = 2
-custom_minimum_size = Vector2(414, 157)
+custom_minimum_size = Vector2(434, 182)
 mouse_filter = 2
 script = ExtResource("6_tactical_hud_script")
 

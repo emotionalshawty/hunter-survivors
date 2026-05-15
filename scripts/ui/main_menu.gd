@@ -50,8 +50,6 @@ func _ready() -> void:
 
 	_highlight_user_id = str(Database.current_user_id)
 
-	# Show whatever is cached immediately, then re-fetch to capture any
-	# stats earned since this client last loaded (e.g. after a finished run).
 	_populate_pilot_stats(Database._last_loaded_data)
 	if not Database.is_data_request_in_progress() and not _highlight_user_id.is_empty():
 		Database.load_player_data(_highlight_user_id)
@@ -70,9 +68,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		accept_event()
 
 
-# ---------------------------------------------------------
-# BUTTON HANDLERS
-# ---------------------------------------------------------
 func _on_play_pressed() -> void:
 	get_tree().change_scene_to_file("res://scenes/main.tscn")
 
@@ -97,9 +92,6 @@ func _on_exit_pressed() -> void:
 	get_tree().quit()
 
 
-# ---------------------------------------------------------
-# DATA UPDATES
-# ---------------------------------------------------------
 func _on_player_data_loaded(loaded_id: String, data: Dictionary) -> void:
 	if loaded_id != Database.current_user_id:
 		return
@@ -152,9 +144,6 @@ func _add_stat_row(label_text: String, value_text: String, value_color: Color) -
 	stats_grid.add_child(value)
 
 
-# ---------------------------------------------------------
-# LEADERBOARD
-# ---------------------------------------------------------
 func _show_leaderboard_loading() -> void:
 	if leaderboard_status != null:
 		leaderboard_status.visible = true
@@ -225,9 +214,6 @@ func _add_leaderboard_row(rank: int, username: String, score: int, is_self: bool
 	leaderboard_list.add_child(row)
 
 
-# ---------------------------------------------------------
-# SETTINGS PANEL
-# ---------------------------------------------------------
 func _sync_settings_checkboxes() -> void:
 	if shake_checkbox != null:
 		shake_checkbox.button_pressed = Settings.screen_shake_enabled

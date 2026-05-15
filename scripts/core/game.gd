@@ -1,8 +1,5 @@
 extends Node2D
 
-# ---------------------------------------------------------
-# Systems
-# ---------------------------------------------------------
 const WeaponSystem = preload("res://scripts/core/systems/weapon_system.gd")
 const LevelUpSystem = preload("res://scripts/core/systems/level_up_system.gd")
 const DatabaseLoadSystem = preload("res://scripts/core/systems/database_load_system.gd")
@@ -12,9 +9,6 @@ const RunStatsScript = preload("res://scripts/core/systems/run_stats.gd")
 const DifficultySystemScript = preload("res://scripts/core/systems/difficulty_system.gd")
 const EnemyScript = preload("res://scripts/entities/enemy.gd")
 
-# ---------------------------------------------------------
-# Scenes
-# ---------------------------------------------------------
 const ENEMY_SCENE: PackedScene = preload("res://scenes/entities/enemy.tscn")
 const BRUTE_ENEMY_SCENE: PackedScene = preload("res://scenes/entities/enemy_brute.tscn")
 const DASHER_ENEMY_SCENE: PackedScene = preload("res://scenes/entities/enemy_dasher.tscn")
@@ -24,9 +18,6 @@ const GHOST_ENEMY_SCENE: PackedScene = preload("res://scenes/entities/enemy_ghos
 const PROJECTILE_SCENE: PackedScene = preload("res://scenes/entities/projectile.tscn")
 const PICKUP_SCENE: PackedScene = preload("res://scenes/entities/pickup.tscn")
 
-# ---------------------------------------------------------
-# Tuning constants
-# ---------------------------------------------------------
 const PLAYER_START_HEALTH: float = 100.0
 const HEALTH_UPGRADE_STEP: float = 20.0
 const SPEED_UPGRADE_STEP: float = 35.0
@@ -35,9 +26,6 @@ const CONTACT_DAMAGE_MULTIPLIER: float = 2.1
 const CONTACT_DAMAGE_COOLDOWN: float = 0.2
 const CONTACT_DAMAGE_RADIUS: float = 30.0
 
-# ---------------------------------------------------------
-# Scene nodes
-# ---------------------------------------------------------
 @onready var player: CharacterBody2D = $Player
 @onready var enemies: Node2D = $Enemies
 @onready var projectiles: Node2D = $Projectiles
@@ -59,20 +47,12 @@ const CONTACT_DAMAGE_RADIUS: float = 30.0
 @onready var pause_layer: Control = $CanvasLayer/PauseLayer
 @onready var post_process_layer: CanvasLayer = $PostProcessLayer
 
-# ---------------------------------------------------------
-# Runtime state
-# ---------------------------------------------------------
 var player_id: String = ""
 var contact_damage_cooldown: float = 0.0
 var _startup_load_attempted: bool = false
-
-# Tracks which weapon modes the player has claimed this run (for level-up filtering).
 var _owned_weapon_modes: Array[int] = []
 var _owned_passives: Array[String] = []
 
-# ---------------------------------------------------------
-# Systems instances
-# ---------------------------------------------------------
 var _run: RunStats
 var _difficulty: DifficultySystem
 var _weapon_system: WeaponSystem
@@ -81,10 +61,6 @@ var _database_load_system: DatabaseLoadSystem
 var _spawn_system: SpawnSystem
 var _spatial_hash: SpatialHash
 
-
-# ==========================================================
-# Lifecycle
-# ==========================================================
 
 func _ready() -> void:
 	if not Database.is_authenticated():
@@ -106,50 +82,41 @@ func _ready() -> void:
 	_reset_run_state()
 	randomize()
 
-	# Level-up buttons
 	damage_upgrade_button.pressed.connect(_on_damage_upgrade_pressed)
 	health_upgrade_button.pressed.connect(_on_health_upgrade_pressed)
 	speed_upgrade_button.pressed.connect(_on_speed_upgrade_pressed)
 	level_up_layer.process_mode = Node.PROCESS_MODE_WHEN_PAUSED
 	level_up_layer.visible = false
 
-	# Weapon visual sync via signals — no per-frame polling needed.
 	_weapon_system.aura_changed.connect(_on_aura_changed)
 	_weapon_system.chain_beam_changed.connect(_on_chain_beam_changed)
 
-	# Game-over overlay
 	if game_over_layer != null:
 		game_over_layer.visible = false
 		_try_connect(game_over_layer, "retry_pressed", _on_retry_pressed)
 		_try_connect(game_over_layer, "sign_out_pressed", _on_sign_out_pressed)
 		_try_connect(game_over_layer, "main_menu_pressed", _on_navigate_main_menu)
 
-	# Pause overlay
 	if pause_layer != null:
 		_try_connect(pause_layer, "resume_pressed", _on_pause_resume)
 		_try_connect(pause_layer, "restart_pressed", _on_pause_restart)
 		_try_connect(pause_layer, "sign_out_pressed", _on_sign_out_pressed)
 		_try_connect(pause_layer, "main_menu_pressed", _on_navigate_main_menu)
 
-	# Settings
 	_apply_post_processing_setting()
 	if not Settings.settings_changed.is_connected(_apply_post_processing_setting):
 		Settings.settings_changed.connect(_apply_post_processing_setting)
 
-	# Timers
 	spawn_timer.timeout.connect(_on_spawn_tick)
 	difficulty_timer.timeout.connect(_on_difficulty_tick)
 	spawn_timer.wait_time = _difficulty.enemy_spawn_interval
 	spawn_timer.start()
 	difficulty_timer.start()
 
-	# Database
 	if not _database_load_system.connect_signals(_on_player_data_loaded, _on_player_data_saved, _on_firebase_error):
-		push_warning("[Game] Database autoload not found.")
 		return
 	player_id = str(Database.current_user_id).strip_edges()
 	if player_id.is_empty():
-		push_warning("[Game] Authenticated user id is empty — save/load disabled.")
 		return
 	var loaded_username := _run.apply_loaded_profile(Database._last_loaded_data, Database.current_username)
 	if not loaded_username.is_empty():
@@ -168,10 +135,6 @@ func _reset_run_state() -> void:
 	_owned_passives.clear()
 	_level_up_system.reset()
 
-
-# ==========================================================
-# Physics / per-frame
-# ==========================================================
 
 func _physics_process(delta: float) -> void:
 	if _spatial_hash != null:
@@ -206,10 +169,6 @@ func _check_contact_damage(delta: float) -> void:
 		break
 
 
-# ==========================================================
-# Input
-# ==========================================================
-
 func _unhandled_input(event: InputEvent) -> void:
 	if not event.is_action_pressed("pause"):
 		return
@@ -223,10 +182,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		pause_layer.open()
 	get_viewport().set_input_as_handled()
 
-
-# ==========================================================
-# Spawning & difficulty
-# ==========================================================
 
 func _on_spawn_tick() -> void:
 	_spawn_system.spawn_tick(
@@ -259,10 +214,6 @@ func _on_enemy_damaged(world_position: Vector2, _damage_kind: String) -> void:
 		effects.spawn_hit(world_position)
 
 
-# ==========================================================
-# Pickups & progression
-# ==========================================================
-
 func _spawn_pickup(xp: int, world_position: Vector2) -> void:
 	var pickup: Area2D = PICKUP_SCENE.instantiate()
 	pickup.global_position = world_position
@@ -283,10 +234,6 @@ func _on_pickup_collected(xp: int, coins: int) -> void:
 		_save_progress()
 	_update_ui()
 
-
-# ==========================================================
-# Level-up flow
-# ==========================================================
 
 func _show_level_up_screen() -> void:
 	if not _level_up_system.show_next(
@@ -358,10 +305,6 @@ func _apply_stat_upgrade(stat_kind: String) -> void:
 		"speed": player.speed += SPEED_UPGRADE_STEP
 
 
-# ==========================================================
-# Game over
-# ==========================================================
-
 func _game_over() -> void:
 	spawn_timer.stop()
 	difficulty_timer.stop()
@@ -377,7 +320,6 @@ func _game_over() -> void:
 		pilot_name = "anonymous"
 
 	var stats: Dictionary = _run.finalize_run(pilot_name, player_id)
-
 	_save_progress({
 		"best_score": _run.best_score,
 		"total_xp_collected": _run.total_xp_collected,
@@ -402,10 +344,6 @@ func _game_over() -> void:
 	if game_over_layer != null and game_over_layer.has_method("show_stats"):
 		game_over_layer.show_stats(stats)
 
-
-# ==========================================================
-# Navigation — all scene transitions go through here
-# ==========================================================
 
 func _navigate_to(scene_path: String, logout: bool = false) -> void:
 	if pause_layer != null and pause_layer.is_open():
@@ -433,14 +371,9 @@ func _on_retry_pressed() -> void:
 	_navigate_to("res://scenes/main.tscn")
 
 
-# ==========================================================
-# Database / save
-# ==========================================================
-
 func _ensure_loaded_progress_from_database() -> void:
 	_startup_load_attempted = _database_load_system.ensure_initial_load(
-		player_id,
-		_startup_load_attempted,
+		player_id, _startup_load_attempted,
 		not Database._last_loaded_data.is_empty(),
 		Database.is_data_request_in_progress()
 	)
@@ -451,8 +384,8 @@ func _save_progress(extra_data: Dictionary = {}) -> void:
 	if database == null or player_id.is_empty():
 		return
 	var mult: float = _weapon_system.projectile_damage_multiplier if _weapon_system != null else 1.0
-	var payload := _run.make_save_payload(player.speed, mult, extra_data)
-	database.save_player_data(player_id, _run.total_coins, _run.highest_level, payload)
+	database.save_player_data(player_id, _run.total_coins, _run.highest_level,
+		_run.make_save_payload(player.speed, mult, extra_data))
 
 
 func _on_player_data_loaded(loaded_player_id: String, data: Dictionary) -> void:
@@ -465,17 +398,13 @@ func _on_player_data_loaded(loaded_player_id: String, data: Dictionary) -> void:
 
 
 func _on_player_data_saved(_saved_id: String, _data: Dictionary) -> void:
-	pass  # Intentionally silent — no print spam in production.
+	pass
 
 
 func _on_firebase_error(operation: String, errored_id: String, code: int, message: String) -> void:
 	if errored_id == player_id:
 		push_warning("[Firebase] %s code=%d: %s" % [operation, code, message])
 
-
-# ==========================================================
-# HUD & visuals
-# ==========================================================
 
 func _update_ui() -> void:
 	if tactical_hud == null:
@@ -519,10 +448,6 @@ func _apply_post_processing_setting() -> void:
 	if post_process_layer != null:
 		post_process_layer.visible = Settings.post_processing_enabled
 
-
-# ==========================================================
-# Helpers
-# ==========================================================
 
 func _try_connect(node: Node, signal_name: String, callable: Callable) -> void:
 	if node.has_signal(signal_name) and not node.get(signal_name).is_connected(callable):

@@ -908,19 +908,20 @@
 
   async function loadGlobalStats() {
     try {
+      const lb = await db.collection('leaderboard').get();
+      const pilotCount = lb.size;
+      setStatEl('stat-pilots', pilotCount);
+      const cp = document.getElementById('corner-pilots');
+      if (cp) cp.textContent = fmt(pilotCount);
+
       const doc = await db.collection('global_stats').doc('summary').get();
       if (doc.exists) {
         const d = doc.data();
-        setStatEl('stat-pilots', d.total_players   ?? null);
-        setStatEl('stat-deaths', d.total_deaths     ?? null);
+        setStatEl('stat-deaths', d.total_deaths       ?? null);
         setStatEl('stat-xp',     d.total_xp_collected ?? null);
         setStatEl('stat-coins',  d.total_coins_earned ?? null);
         setStatEl('stat-games',  d.total_games_played ?? null);
-        const cp = document.getElementById('corner-pilots');
-        if (cp) cp.textContent = fmt(d.total_players ?? null);
       } else {
-        const lb = await db.collection('leaderboard').get();
-        setStatEl('stat-pilots', lb.size);
         ['stat-deaths','stat-xp','stat-coins','stat-games'].forEach(id => setStatEl(id, null));
       }
     } catch (err) {

@@ -419,17 +419,31 @@ func fetch_leaderboard(limit: int = 10) -> void:
 
 
 func push_global_stats(xp_gained: int, coins_earned: int) -> void:
-	if not is_authenticated():
+	if not is_authenticated() or id_token.is_empty():
 		return
-	_sync_firestore_auth()
-	var collection: FirestoreCollection = Firebase.Firestore.collection("global_stats")
-	var doc := FirestoreDocument.new()
-	doc.doc_name = "summary"
-	doc.collection_name = "global_stats"
-	doc._transforms.push_back(IncrementTransform.new("summary", false, "total_deaths", 1))
-	doc._transforms.push_back(IncrementTransform.new("summary", false, "total_xp_collected", xp_gained))
-	doc._transforms.push_back(IncrementTransform.new("summary", false, "total_coins_earned", coins_earned))
-	doc._transforms.push_back(IncrementTransform.new("summary", false, "total_games_played", 1))
-	var result: Variant = await collection.commit(doc)
-	if result == null or (result is Dictionary and result.has("error")):
-		push_warning("[GlobalStats] push failed: %s" % str(result))
+	const PROJECT_ID := "huntersurv-2f7da"
+	const COMMIT_URL := "https://firestore.googleapis.com/v1/projects/" + PROJECT_ID + "/databases/(default)/documents:commit"
+	const DOC_PATH := "projects/" + PROJECT_ID + "/databases/(default)/documents/global_stats/summary"
+
+	var body := JSON.stringify({
+		"writes": [{
+			"transform": {
+				"document": DOC_PATH,
+				"fieldTransforms": [
+					{"fieldPath": "total_deaths",      "increment": {"integerValue": str(1)}},
+					{"fieldPath": "total_xp_collected","increment": {"integerValue": str(xp_gained)}},
+					{"fieldPath": "total_coins_earned","increment": {"integerValue": str(coins_earned)}},
+					{"fieldPath": "total_games_played","increment": {"integerValue": str(1)}}
+				]
+			}
+		}]
+	})
+	var headers := PackedStringArray([
+		"Content-Type: application/json",
+		"Authorization: Bearer " + id_token
+	])
+	var http := HTTPRequest.new()
+	add_child(http)
+	http.timeout = 10.0
+	http.request_completed.connect(func(_result, _code, _hdrs, _body): http.queue_free())
+	http.request(COMMIT_URL, headers, HTTPClient.METHOD_POST, body)

@@ -1,8 +1,6 @@
 extends Camera2D
 
-# Trauma-based screen shake.
-# Call add_trauma(amount) from anywhere. Shake magnitude = trauma^trauma_power.
-# Trauma decays linearly toward 0.
+
 
 @export var trauma_power: float = 2.0
 @export var max_offset: Vector2 = Vector2(18.0, 14.0)

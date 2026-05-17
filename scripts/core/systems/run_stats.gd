@@ -34,7 +34,7 @@ func reset(start_health: float) -> void:
 	_run_start_ticks_ms = Time.get_ticks_msec()
 
 
-# Loads lifetime stats from Firebase data. Returns the username found.
+# Carga stats desde firebase
 func apply_loaded_profile(data: Dictionary, fallback_username: String) -> String:
 	total_coins = int(data.get("total_coins", 0))
 	highest_level = max(highest_level, int(data.get("highest_level", 1)))
@@ -44,7 +44,7 @@ func apply_loaded_profile(data: Dictionary, fallback_username: String) -> String
 	return str(data.get("username", fallback_username)).strip_edges()
 
 
-# Returns list of newly reached levels so the caller can queue level-up screens.
+
 func on_pickup_collected(xp: int, coins: int) -> Array[int]:
 	score += coins
 	experience += xp
@@ -67,7 +67,7 @@ func get_run_time_ms() -> int:
 	return Time.get_ticks_msec() - _run_start_ticks_ms
 
 
-# Commits the run to lifetime stats and returns the game-over stats dict.
+# Commits the run to lifetime stats and returns the game over stats 
 func finalize_run(pilot_name: String, user_id: String) -> Dictionary:
 	var run_score := score
 	var is_new_best := run_score > best_score

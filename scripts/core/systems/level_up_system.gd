@@ -26,9 +26,7 @@ var pending_choices: Array[String] = []
 var active: bool = false
 var current_choice_type: String = ""
 
-# Each entry describes a single button offer:
-# {"kind": "active", "mode": int, "label": String}
-# {"kind": "passive", "id": String, "label": String}
+
 var current_offers: Array[Dictionary] = []
 
 

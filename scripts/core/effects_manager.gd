@@ -1,7 +1,5 @@
 extends Node2D
 
-# Spawns one-shot CPUParticles2D bursts at positions.
-# Created nodes auto free after their lifetime via SceneTreeTimer.
 
 const HIT_COLOR := Color(1.0, 0.85, 0.45, 1.0)
 const DEATH_COLOR := Color(1.0, 0.55, 0.22, 1.0)

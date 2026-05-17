@@ -2,8 +2,7 @@ extends Resource
 
 class_name WeaponItem
 
-# Persistent, ownable, tradeable weapon instance.
-# Mirrored to Firestore /items/{item_id} for the player-driven economy.
+
 
 const RARITY_COMMON: String = "common"
 const RARITY_RARE: String = "rare"
@@ -12,7 +11,6 @@ const RARITY_LEGENDARY: String = "legendary"
 
 const RARITIES: Array[String] = [RARITY_COMMON, RARITY_RARE, RARITY_EPIC, RARITY_LEGENDARY]
 
-# Identity
 var item_id: String = ""
 var owner_id: String = ""
 var weapon_mode: int = 0
@@ -22,11 +20,10 @@ var rarity: String = RARITY_COMMON
 var weapon_xp: int = 0
 var weapon_level: int = 1
 
-# Marketplace flags
 var tradeable: bool = false
 var obtained_at_unix: int = 0
 
-# Stat modifiers — applied on top of WeaponData.BASE_STATS
+# Stat modifiers, applied on top of WeaponData.BASE_STATS
 var damage_mult_bonus: float = 0.0       # +0.15 = +15% damage
 var fire_rate_mult: float = 1.0           # 0.9 = 10% faster (interval *= this)
 var pierce_bonus: int = 0

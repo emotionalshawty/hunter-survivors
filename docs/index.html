@@ -13,6 +13,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=IBM+Plex+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
 
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 
   <style>
@@ -44,7 +45,6 @@
       overflow-x: hidden;
     }
 
-    /* scanline overlay */
     body::after {
       content: '';
       position: fixed; inset: 0;
@@ -59,7 +59,6 @@
       z-index: 9999;
     }
 
-    /* noise */
     body::before {
       content: '';
       position: fixed; inset: 0;
@@ -71,7 +70,6 @@
     a { color: inherit; text-decoration: none; }
     * { position: relative; z-index: 1; }
 
-    /* ── NAV ── */
     nav {
       position: fixed; top: 0; left: 0; right: 0; z-index: 200;
       display: flex; align-items: center; justify-content: space-between;
@@ -107,7 +105,6 @@
     }
     @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.15} }
 
-    /* ── HERO ── */
     #hero {
       min-height: 100vh;
       display: flex; flex-direction: column;
@@ -184,7 +181,6 @@
     }
     .btn-ghost:hover { border-color: var(--teal); color: var(--teal); }
 
-    /* ── STATS STRIP ── */
     #stats-bar {
       border-bottom: 1px solid var(--line);
       background: var(--bg2);
@@ -231,7 +227,6 @@
     }
     @keyframes shimmer { 0%{background-position:100%} 100%{background-position:0%} }
 
-    /* ── SECTION SHARED ── */
     .section {
       padding: clamp(60px,8vw,100px) clamp(20px,5vw,80px);
       border-bottom: 1px solid var(--line);
@@ -264,7 +259,6 @@
       max-width: 480px; line-height: 1.75; margin-bottom: 48px;
     }
 
-    /* ── FEATURES ── */
     .features-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -294,7 +288,6 @@
     }
     .feature-cell p { font-size: 12px; color: var(--dim); line-height: 1.7; }
 
-    /* ── WEAPONS ── */
     .weapons-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -329,7 +322,6 @@
 
     .weapon-cell p { font-size: 11px; color: var(--dim); line-height: 1.6; }
 
-    /* ── HOW TO PLAY ── */
     .htp-layout {
       display: grid; grid-template-columns: 1fr 1fr;
       gap: 60px; align-items: start;
@@ -391,7 +383,6 @@
     .enemies-row .name { color: var(--teal); font-weight: 700; }
     .enemies-row .desc { color: var(--dim); }
 
-    /* ── LEADERBOARD ── */
     .lb-layout {
       display: grid; grid-template-columns: 1fr 1fr;
       gap: 60px; align-items: start;
@@ -462,7 +453,6 @@
     }
     .info-block p { font-size: 11px; color: var(--dim); line-height: 1.7; }
 
-    /* ── DOWNLOAD ── */
     #download { text-align: center; }
 
     .dl-card {
@@ -509,7 +499,6 @@
     }
     .btn-gh:hover { border-color: var(--teal); color: var(--teal); }
 
-    /* ── FOOTER ── */
     footer {
       background: var(--bg);
       border-top: 1px solid var(--line);
@@ -531,7 +520,6 @@
     }
     .footer-links a:hover { color: var(--teal); }
 
-    /* ── REVEAL ── */
     .reveal { opacity: 0; transform: translateY(16px); transition: opacity 0.45s ease, transform 0.45s ease; }
     .reveal.visible { opacity: 1; transform: translateY(0); }
 
@@ -539,6 +527,138 @@
       .nav-links { display: none; }
       .stats-inner { grid-template-columns: repeat(2, 1fr); }
       .stat-cell:last-child { grid-column: span 2; }
+    }
+
+    .nav-auth-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 14px;
+      font-family: var(--mono); font-size: 10px; font-weight: 700;
+      letter-spacing: 0.12em; text-transform: uppercase;
+      background: transparent; color: var(--teal);
+      border: 1px solid rgba(91,245,175,0.35);
+      cursor: pointer; transition: border-color 0.15s, background 0.15s;
+    }
+    .nav-auth-btn:hover { border-color: var(--teal); background: rgba(91,245,175,0.06); }
+    .nav-user-chip {
+      display: none; align-items: center; gap: 10px;
+      font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--dim);
+    }
+    .nav-user-chip.visible { display: flex; }
+    .nav-user-name { color: var(--teal); font-weight: 700; }
+    .nav-logout-btn {
+      background: none; border: none; cursor: pointer;
+      font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--dim); transition: color 0.15s;
+    }
+    .nav-logout-btn:hover { color: #e63950; }
+
+    #auth-overlay {
+      display: none; position: fixed; inset: 0; z-index: 500;
+      background: rgba(0,0,0,0.85); backdrop-filter: blur(4px);
+      align-items: center; justify-content: center;
+    }
+    #auth-overlay.open { display: flex; }
+    .auth-panel {
+      background: var(--bg2); border: 1px solid var(--line);
+      width: 100%; max-width: 400px; margin: 20px;
+    }
+    .auth-panel-head {
+      padding: 14px 20px; border-bottom: 1px solid var(--line);
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .auth-panel-head span {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.18em;
+      text-transform: uppercase; color: var(--teal);
+    }
+    .auth-close-btn {
+      background: none; border: none; cursor: pointer;
+      font-family: var(--mono); font-size: 18px; color: var(--dim);
+      line-height: 1; transition: color 0.15s;
+    }
+    .auth-close-btn:hover { color: var(--bright); }
+    .auth-body { padding: 24px 20px; }
+    .auth-tabs {
+      display: grid; grid-template-columns: 1fr 1fr;
+      border: 1px solid var(--line); margin-bottom: 24px;
+    }
+    .auth-tab {
+      padding: 10px; background: none; border: none; cursor: pointer;
+      font-family: var(--mono); font-size: 11px; font-weight: 700;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--dim); transition: background 0.15s, color 0.15s;
+    }
+    .auth-tab.active { background: var(--bg3); color: var(--teal); }
+    .auth-tab:first-child { border-right: 1px solid var(--line); }
+    .auth-field { margin-bottom: 14px; }
+    .auth-field label {
+      display: block; font-size: 9px; font-weight: 700;
+      letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--dim); margin-bottom: 6px;
+    }
+    .auth-field input {
+      width: 100%; padding: 10px 12px;
+      background: var(--bg3); border: 1px solid var(--line);
+      font-family: var(--mono); font-size: 13px; color: var(--bright);
+      outline: none; transition: border-color 0.15s;
+    }
+    .auth-field input:focus { border-color: var(--teal); }
+    .auth-field input::placeholder { color: var(--dim); }
+    .auth-submit {
+      width: 100%; padding: 12px;
+      background: var(--teal); color: var(--bg);
+      font-family: var(--mono); font-size: 12px; font-weight: 700;
+      letter-spacing: 0.12em; text-transform: uppercase;
+      border: none; cursor: pointer; margin-top: 8px; transition: opacity 0.15s;
+    }
+    .auth-submit:hover { opacity: 0.85; }
+    .auth-submit:disabled { opacity: 0.4; cursor: not-allowed; }
+    .auth-status {
+      margin-top: 14px; padding: 10px 12px;
+      font-family: var(--mono); font-size: 11px;
+      letter-spacing: 0.04em; line-height: 1.5; display: none;
+    }
+    .auth-status.error  { display: block; color: #e63950; border-left: 3px solid #e63950; }
+    .auth-status.success{ display: block; color: var(--teal); border-left: 3px solid var(--teal); }
+    .auth-note {
+      margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line);
+      font-size: 10px; color: var(--dim); line-height: 1.6;
+    }
+
+    #personal-panel {
+      display: none; background: var(--bg2);
+      border-bottom: 1px solid var(--line);
+      padding: 0 clamp(20px,5vw,80px);
+    }
+    #personal-panel.visible { display: block; }
+    .personal-inner { max-width: var(--max); margin: 0 auto; padding: 20px 0; }
+    .personal-head {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .personal-head-label {
+      font-size: 9px; font-weight: 700; letter-spacing: 0.2em;
+      text-transform: uppercase; color: var(--teal);
+    }
+    .personal-pilot {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--dim);
+    }
+    .personal-pilot span { color: var(--bright); }
+    .personal-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(110px,1fr));
+      gap: 1px; background: var(--line); border: 1px solid var(--line);
+    }
+    .personal-cell { background: var(--bg); padding: 14px 16px; }
+    .personal-val {
+      font-family: 'Space Mono', monospace; font-size: 20px;
+      font-weight: 700; color: var(--teal); display: block; margin-bottom: 4px;
+    }
+    .personal-val.orange { color: var(--orange); }
+    .personal-val.red    { color: #e63950; }
+    .personal-lbl {
+      font-size: 9px; font-weight: 700; letter-spacing: 0.15em;
+      text-transform: uppercase; color: var(--dim);
     }
   </style>
 </head>
@@ -552,9 +672,17 @@
     <a href="#leaderboard">RANKINGS</a>
     <a href="#download">INITIALIZE</a>
   </div>
-  <div class="nav-status">
-    <span class="nav-dot"></span>
-    CHANNEL SECURE
+  <div style="display:flex;align-items:center;gap:16px;">
+    <div class="nav-user-chip" id="nav-user-chip">
+      <span class="nav-dot"></span>
+      <span class="nav-user-name" id="nav-username">PILOT</span>
+      <button class="nav-logout-btn" onclick="authLogout()">[ SIGN OUT ]</button>
+    </div>
+    <button class="nav-auth-btn" id="nav-signin-btn" onclick="openAuth()">[ SIGN IN ]</button>
+    <div class="nav-status" id="nav-channel" style="display:none;">
+      <span class="nav-dot"></span>
+      CHANNEL SECURE
+    </div>
   </div>
 </nav>
 
@@ -606,6 +734,37 @@
     <div class="stat-cell">
       <span class="stat-value white" id="stat-games"><span class="shimmer"></span></span>
       <span class="stat-label">Games Played</span>
+    </div>
+  </div>
+</div>
+
+<div id="personal-panel">
+  <div class="personal-inner">
+    <div class="personal-head">
+      <span class="personal-head-label">YOUR STATS</span>
+      <span class="personal-pilot">PILOT: <span id="personal-name">—</span></span>
+    </div>
+    <div class="personal-grid">
+      <div class="personal-cell">
+        <span class="personal-val" id="p-best">—</span>
+        <span class="personal-lbl">Best Score</span>
+      </div>
+      <div class="personal-cell">
+        <span class="personal-val" id="p-level">—</span>
+        <span class="personal-lbl">Highest Level</span>
+      </div>
+      <div class="personal-cell">
+        <span class="personal-val orange" id="p-coins">—</span>
+        <span class="personal-lbl">Total Credits</span>
+      </div>
+      <div class="personal-cell">
+        <span class="personal-val" id="p-xp">—</span>
+        <span class="personal-lbl">Total XP</span>
+      </div>
+      <div class="personal-cell">
+        <span class="personal-val red" id="p-deaths">—</span>
+        <span class="personal-lbl">Deaths</span>
+      </div>
     </div>
   </div>
 </div>
@@ -872,6 +1031,38 @@
   </div>
 </section>
 
+<div id="auth-overlay" onclick="overlayClick(event)">
+  <div class="auth-panel">
+    <div class="auth-panel-head">
+      <span id="auth-panel-title">PILOT AUTHENTICATION</span>
+      <button class="auth-close-btn" onclick="closeAuth()">✕</button>
+    </div>
+    <div class="auth-body">
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="tab-login" onclick="switchTab('login')">LOGIN</button>
+        <button class="auth-tab"        id="tab-register" onclick="switchTab('register')">REGISTER</button>
+      </div>
+      <div class="auth-field" id="field-username" style="display:none">
+        <label>Pilot Name (username)</label>
+        <input type="text" id="auth-username" placeholder="your_callsign" autocomplete="off" />
+      </div>
+      <div class="auth-field">
+        <label>Email</label>
+        <input type="email" id="auth-email" placeholder="pilot@example.com" autocomplete="email" />
+      </div>
+      <div class="auth-field">
+        <label>Password</label>
+        <input type="password" id="auth-password" placeholder="••••••••" autocomplete="current-password" />
+      </div>
+      <button class="auth-submit" id="auth-submit-btn" onclick="authSubmit()">INITIALIZE</button>
+      <div class="auth-status" id="auth-status"></div>
+      <p class="auth-note">
+        Accounts created here are the same ones used in-game — your stats and leaderboard entries are shared across both.
+      </p>
+    </div>
+  </div>
+</div>
+
 <footer>
   <span class="footer-id"><span>SYS//</span>HUNTER SURVIVORS</span>
   <p>GODOT 4 · FIREBASE · CFGs 2026</p>
@@ -891,7 +1082,8 @@
   };
 
   firebase.initializeApp(firebaseConfig);
-  const db = firebase.firestore();
+  const db   = firebase.firestore();
+  const auth = firebase.auth();
 
   function fmt(n) {
     if (n === null || n === undefined) return '—';
@@ -899,20 +1091,146 @@
     if (n >= 1_000)     return (n / 1_000).toFixed(1) + 'K';
     return n.toLocaleString();
   }
-
   function setStatEl(id, val) {
     const el = document.getElementById(id);
     if (!el) return;
     el.innerHTML = val !== null ? fmt(val) : '<span style="color:var(--dim)">—</span>';
   }
+  function escHtml(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  auth.onAuthStateChanged(async user => {
+    const signinBtn  = document.getElementById('nav-signin-btn');
+    const userChip   = document.getElementById('nav-user-chip');
+    const nameLbl    = document.getElementById('nav-username');
+    const panel      = document.getElementById('personal-panel');
+    const channel    = document.getElementById('nav-channel');
+
+    if (user) {
+      // show chip, hide sign-in btn
+      signinBtn.style.display  = 'none';
+      userChip.classList.add('visible');
+      channel && (channel.style.display = 'flex');
+
+      // load user profile from Firestore
+      try {
+        const doc = await db.collection('users').doc(user.uid).get();
+        const d   = doc.exists ? doc.data() : {};
+        const username = d.username || user.email.split('@')[0];
+        nameLbl.textContent = username.toUpperCase();
+        document.getElementById('personal-name').textContent = username.toUpperCase();
+        setStatEl('p-best',   d.best_score        ?? null);
+        setStatEl('p-level',  d.highest_level      ?? null);
+        setStatEl('p-coins',  d.total_coins        ?? null);
+        setStatEl('p-xp',     d.total_xp_collected ?? null);
+        setStatEl('p-deaths', d.lifetime_deaths    ?? null);
+        panel.classList.add('visible');
+      } catch(e) {
+        nameLbl.textContent = user.email.split('@')[0].toUpperCase();
+      }
+      closeAuth();
+    } else {
+      signinBtn.style.display = '';
+      userChip.classList.remove('visible');
+      panel.classList.remove('visible');
+      channel && (channel.style.display = 'none');
+    }
+  });
+
+  async function authLogout() {
+    await auth.signOut();
+  }
+
+  let authMode = 'login';
+
+  function openAuth() {
+    document.getElementById('auth-overlay').classList.add('open');
+    document.getElementById('auth-email').focus();
+  }
+  function closeAuth() {
+    document.getElementById('auth-overlay').classList.remove('open');
+    setAuthStatus('', '');
+  }
+  function overlayClick(e) {
+    if (e.target === document.getElementById('auth-overlay')) closeAuth();
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeAuth();
+  });
+
+  function switchTab(mode) {
+    authMode = mode;
+    document.getElementById('tab-login').classList.toggle('active', mode === 'login');
+    document.getElementById('tab-register').classList.toggle('active', mode === 'register');
+    document.getElementById('field-username').style.display = mode === 'register' ? '' : 'none';
+    document.getElementById('auth-password').autocomplete = mode === 'login' ? 'current-password' : 'new-password';
+    document.getElementById('auth-submit-btn').textContent = mode === 'login' ? 'INITIALIZE' : 'CREATE PILOT';
+    setAuthStatus('', '');
+  }
+
+  function setAuthStatus(msg, type) {
+    const el = document.getElementById('auth-status');
+    el.textContent = msg;
+    el.className = 'auth-status' + (type ? ' ' + type : '');
+  }
+
+  function setAuthBusy(busy) {
+    document.getElementById('auth-submit-btn').disabled = busy;
+    document.getElementById('auth-submit-btn').textContent = busy
+      ? 'CONNECTING...'
+      : (authMode === 'login' ? 'INITIALIZE' : 'CREATE PILOT');
+  }
+
+  async function authSubmit() {
+    const email    = document.getElementById('auth-email').value.trim();
+    const password = document.getElementById('auth-password').value;
+    const username = document.getElementById('auth-username').value.trim();
+
+    if (!email || !password) { setAuthStatus('Email and password are required.', 'error'); return; }
+    if (authMode === 'register' && !username) { setAuthStatus('Pilot name is required.', 'error'); return; }
+    if (authMode === 'register' && password.length < 6) { setAuthStatus('Password must be at least 6 characters.', 'error'); return; }
+
+    setAuthBusy(true);
+    try {
+      if (authMode === 'login') {
+        await auth.signInWithEmailAndPassword(email, password);
+        setAuthStatus('Access granted. Welcome back, pilot.', 'success');
+      } else {
+        const cred = await auth.createUserWithEmailAndPassword(email, password);
+        // Create the user profile in Firestore (same schema the game uses)
+        await db.collection('users').doc(cred.user.uid).set({
+          username:           username,
+          total_coins:        0,
+          highest_level:      1,
+          best_score:         0,
+          total_xp_collected: 0,
+          lifetime_deaths:    0,
+        });
+        setAuthStatus('Pilot registered. Welcome, ' + username + '.', 'success');
+      }
+    } catch(err) {
+      const msgs = {
+        'auth/user-not-found':       'No pilot found with that email.',
+        'auth/wrong-password':       'Incorrect password.',
+        'auth/invalid-credential':   'Invalid email or password.',
+        'auth/email-already-in-use': 'That email is already registered. Try logging in.',
+        'auth/invalid-email':        'Invalid email address.',
+        'auth/weak-password':        'Password must be at least 6 characters.',
+        'auth/too-many-requests':    'Too many attempts. Try again later.',
+      };
+      setAuthStatus(msgs[err.code] || err.message, 'error');
+    }
+    setAuthBusy(false);
+  }
 
   async function loadGlobalStats() {
     try {
       const lb = await db.collection('leaderboard').get();
-      const pilotCount = lb.size;
-      setStatEl('stat-pilots', pilotCount);
+      setStatEl('stat-pilots', lb.size);
       const cp = document.getElementById('corner-pilots');
-      if (cp) cp.textContent = fmt(pilotCount);
+      if (cp) cp.textContent = fmt(lb.size);
 
       const doc = await db.collection('global_stats').doc('summary').get();
       if (doc.exists) {
@@ -944,32 +1262,21 @@
       });
       entries.sort((a, b) => b.score - a.score);
       entries = entries.slice(0, 10);
-
       if (entries.length === 0) {
         list.innerHTML = '<div id="lb-list-placeholder">NO ENTRIES YET — BE THE FIRST</div>';
-        btn.classList.remove('spinning');
-        return;
+        btn.classList.remove('spinning'); return;
       }
-
-      const rc = ['g1','g2','g3'];
-      const rl = ['01','02','03'];
+      const rc = ['g1','g2','g3'], rl = ['01','02','03'];
       list.innerHTML = entries.map((e, i) => `
         <div class="lb-row">
           <span class="lb-rank ${rc[i]??''}">${rl[i]??'#'+(i+1)}</span>
           <span class="lb-name">${escHtml(e.name)}</span>
           <span class="lb-score">${e.score.toLocaleString()}</span>
-        </div>
-      `).join('');
+        </div>`).join('');
     } catch (err) {
       list.innerHTML = '<div id="lb-list-placeholder" style="color:var(--red)">REGISTRY UNAVAILABLE</div>';
     }
     btn.classList.remove('spinning');
-  }
-
-  function escHtml(str) {
-    return String(str)
-      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
-      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
   const obs = new IntersectionObserver(entries => {

@@ -116,7 +116,7 @@ func _draw() -> void:
 
 	# --- Stats row ---
 	var col := w / 3.0
-	_stat_col(Vector2(0.0,       STATS_Y), col, "RUN",     str(run_score),  ACCENT_GOLD)
+	_stat_col(Vector2(0.0,       STATS_Y), col, "SCORE",   str(run_score),  ACCENT_GOLD)
 	_stat_col(Vector2(col,       STATS_Y), col, "BEST",    str(best_score), ACCENT_CYAN)
 	_stat_col(Vector2(col * 2.0, STATS_Y), col, "CREDITS", str(credits),    ACCENT_ORANGE)
 
